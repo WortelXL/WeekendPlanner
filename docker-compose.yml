@@ -1,0 +1,19 @@
+services:
+  weekendplanner:
+    build: .
+    container_name: weekendplanner
+    ports:
+      - "80:80"
+    environment:
+      # Start-pincode voor de admin (alleen gebruikt bij de allereerste start).
+      # Wijzig hem daarna via Instellingen in de app.
+      - ADMIN_PIN=1234
+      - TZ=Europe/Amsterdam
+      # Zet op 1 als de app achter een reverse proxy (Nginx Proxy Manager, Traefik, ...) draait,
+      # zodat vergrendeling per echt IP-adres werkt.
+      - BEHIND_PROXY=0
+      # Zet op 1 als je de site via HTTPS benadert.
+      - COOKIE_SECURE=0
+    volumes:
+      - ./data:/data
+    restart: unless-stopped

@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#2f5d50">
+<title>Familieweekend</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏕️</text></svg>">
+<style>
+:root{
+  --bg:#f6f3ec; --card:#ffffff; --ink:#1f2a26; --muted:#6b756f; --line:#e4dfd3;
+  --brand:#2f5d50; --brand-2:#3f7a69; --brand-soft:#e3eee9; --accent:#e08a3c;
+  --danger:#c0392b; --danger-soft:#fbe9e7; --warn-soft:#fff4e0;
+  --radius:16px; --shadow:0 1px 2px rgba(0,0,0,.05),0 6px 20px rgba(31,42,38,.07);
+}
+@media (prefers-color-scheme: dark){
+  :root{--bg:#141a18;--card:#1d2522;--ink:#e9efec;--muted:#9aa7a1;--line:#2c3733;
+  --brand:#6fb39d;--brand-2:#86c4b0;--brand-soft:#21332d;--accent:#f0a560;
+  --danger:#ef7a6b;--danger-soft:#3a2522;--warn-soft:#3a3020;--shadow:0 1px 2px rgba(0,0,0,.3);}
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);
+  font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}
+a{color:var(--brand)}
+.hidden{display:none!important}
+
+/* ---------- PIN ---------- */
+#pinView{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px 16px;
+  background:radial-gradient(circle at 20% 10%,var(--brand-soft),transparent 60%),var(--bg)}
+.pinbox{width:100%;max-width:340px;text-align:center}
+.pinbox .logo{font-size:56px;line-height:1}
+.pinbox h1{margin:8px 0 2px;font-size:26px}
+.pinbox p.sub{margin:0 0 22px;color:var(--muted)}
+.dots{display:flex;justify-content:center;gap:12px;height:22px;margin-bottom:10px}
+.dots span{width:16px;height:16px;border-radius:50%;border:2px solid var(--brand);transition:.15s}
+.dots span.on{background:var(--brand)}
+.pinmsg{min-height:24px;font-size:14px;margin-bottom:12px;color:var(--danger)}
+.pinmsg.info{color:var(--muted)}
+.keypad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.keypad button{height:64px;border-radius:50%;border:1px solid var(--line);background:var(--card);
+  font-size:24px;font-weight:600;cursor:pointer;box-shadow:var(--shadow);aspect-ratio:1;margin:auto;width:64px}
+.keypad button:active{transform:scale(.95);background:var(--brand-soft)}
+.keypad button.ok{background:var(--brand);color:#fff;border-color:var(--brand);font-size:18px}
+.keypad button.ghost{background:transparent;box-shadow:none;border-color:transparent}
+.keypad button:disabled{opacity:.35;cursor:not-allowed}
+
+/* ---------- App shell ---------- */
+header.top{position:sticky;top:0;z-index:10;background:var(--brand);color:#fff}
+header.top .in{max-width:1000px;margin:auto;padding:12px 16px;display:flex;align-items:center;gap:10px}
+header.top h1{font-size:19px;margin:0;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.badge{font-size:12px;padding:3px 10px;border-radius:99px;background:rgba(255,255,255,.18);text-transform:capitalize}
+header .hbtn{background:rgba(255,255,255,.12);border:0;color:#fff;border-radius:10px;padding:7px 11px;cursor:pointer}
+header .hbtn:hover{background:rgba(255,255,255,.22)}
+main{max-width:1000px;margin:auto;padding:20px 16px 60px}
+
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--card);
+  border-radius:10px;padding:8px 14px;cursor:pointer;font-weight:500}
+.btn:hover{border-color:var(--brand)}
+.btn.primary{background:var(--brand);color:#fff;border-color:var(--brand)}
+.btn.primary:hover{background:var(--brand-2)}
+.btn.danger{color:var(--danger)}
+.btn.danger:hover{border-color:var(--danger);background:var(--danger-soft)}
+.btn.sm{padding:4px 10px;font-size:14px}
+.icon-btn{border:0;background:transparent;cursor:pointer;padding:4px 6px;border-radius:8px;color:var(--muted)}
+.icon-btn:hover{background:var(--brand-soft);color:var(--ink)}
+
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.spacer{flex:1}
+h2{font-size:22px;margin:0}
+.muted{color:var(--muted)}
+.notice{background:var(--warn-soft);border-radius:12px;padding:12px 14px;margin-bottom:16px;font-size:15px}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px}
+.ecard{cursor:pointer;transition:.15s;display:flex;flex-direction:column;gap:6px}
+.ecard:hover{transform:translateY(-2px);border-color:var(--brand)}
+.ecard .emo{font-size:34px;line-height:1}
+.ecard h3{margin:4px 0 0;font-size:18px}
+.ecard .meta{font-size:14px;color:var(--muted)}
+.empty{text-align:center;padding:40px 16px;color:var(--muted)}
+.empty .big{font-size:48px}
+
+/* ---------- Detail ---------- */
+.hero{display:flex;gap:14px;align-items:flex-start}
+.hero .emo{font-size:48px;line-height:1}
+.hero h2{font-size:26px}
+.hero .desc{white-space:pre-wrap;margin-top:6px}
+.tabs{display:flex;gap:6px;margin:20px 0 14px;border-bottom:1px solid var(--line);overflow-x:auto}
+.tabs button{border:0;background:none;padding:10px 14px;cursor:pointer;color:var(--muted);font-weight:600;
+  border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap}
+.tabs button.on{color:var(--brand);border-color:var(--brand)}
+
+.day{margin-bottom:18px}
+.day h4{margin:0 0 8px;font-size:15px;text-transform:capitalize;color:var(--brand)}
+.pitem{display:flex;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:var(--card);margin-bottom:8px}
+.pitem .time{min-width:92px;font-weight:600;font-variant-numeric:tabular-nums}
+.pitem .what{flex:1;min-width:0}
+.pitem .what b{display:block}
+.pitem .who{font-size:13px;color:var(--muted)}
+.pitem .notes{font-size:14px;white-space:pre-wrap;margin-top:2px}
+.pitem .acts{display:flex;align-items:flex-start}
+
+.loc h3{margin:0}
+.map{width:100%;height:320px;border:0;border-radius:12px;margin-top:14px;background:var(--brand-soft)}
+.pre{white-space:pre-wrap}
+.section-title{display:flex;align-items:center;gap:10px;margin:22px 0 10px}
+.section-title h3{margin:0;font-size:17px;flex:1}
+
+table.contacts{width:100%;border-collapse:collapse}
+table.contacts th,table.contacts td{text-align:left;padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top;font-size:15px}
+table.contacts th{font-size:13px;color:var(--muted);font-weight:600}
+@media (max-width:640px){
+  table.contacts thead{display:none}
+  table.contacts tr{display:block;border:1px solid var(--line);border-radius:12px;padding:8px;margin-bottom:8px;background:var(--card)}
+  table.contacts td{display:block;border:0;padding:2px 6px}
+  .pitem{flex-wrap:wrap}
+  .pitem .time{min-width:auto;width:100%}
+}
+
+/* ---------- Settings ---------- */
+.setgrid{display:grid;gap:14px;margin-top:16px}
+.pinrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid var(--line)}
+.pinrow:last-child{border-bottom:0}
+.pinrow .rname{width:90px;font-weight:600;text-transform:capitalize}
+.pinrow .st{font-size:13px;width:110px}
+.ok-t{color:var(--brand)} .no-t{color:var(--muted)}
+input.field,textarea.field,select.field{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:10px;background:var(--bg)}
+input.field:focus,textarea.field:focus,select.field:focus{outline:2px solid var(--brand);outline-offset:-1px}
+.pinrow input.field{width:150px}
+label.lbl{display:block;font-size:14px;font-weight:600;margin:10px 0 4px}
+.help{font-size:13px;color:var(--muted)}
+
+/* ---------- Modal ---------- */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;z-index:50;padding:0}
+.modal{background:var(--card);width:100%;max-width:520px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:20px}
+@media (min-width:600px){.modal-bg{align-items:center;padding:16px}.modal{border-radius:18px}}
+.modal h3{margin:0 0 6px}
+.modal .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.modal .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:18px}
+.modal .error{color:var(--danger);font-size:14px;min-height:20px;margin-top:8px}
+.emoji-pick{display:flex;flex-wrap:wrap;gap:6px}
+.emoji-pick button{font-size:24px;border:1px solid var(--line);background:var(--bg);border-radius:10px;width:44px;height:44px;cursor:pointer}
+.emoji-pick button.on{border-color:var(--brand);background:var(--brand-soft)}
+
+#toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);
+  padding:10px 16px;border-radius:10px;z-index:60;font-size:15px;opacity:0;transition:.2s;pointer-events:none}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<!-- PIN -->
+<section id="pinView" class="hidden">
+  <div class="pinbox">
+    <div class="logo">🏕️</div>
+    <h1 id="pinTitle">Familieweekend</h1>
+    <p class="sub">Voer je pincode in</p>
+    <div class="dots" id="dots"></div>
+    <div class="pinmsg" id="pinMsg"></div>
+    <div class="keypad" id="keypad"></div>
+  </div>
+</section>
+
+<!-- APP -->
+<section id="appView" class="hidden">
+  <header class="top"><div class="in">
+    <h1 id="appTitle" onclick="go('list')">Familieweekend</h1>
+    <span class="badge" id="roleBadge"></span>
+    <button class="hbtn hidden" id="btnSettings" onclick="go('settings')" title="Instellingen">⚙️</button>
+    <button class="hbtn" onclick="logout()" title="Uitloggen">Uitloggen</button>
+  </div></header>
+  <main id="main"></main>
+</section>
+
+<div id="modalRoot"></div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const S = {role:null, title:'Familieweekend', adminDefault:false, view:'list', event:null, tab:'planning'};
+const RANK = {lezer:1, planner:2, admin:3};
+const can = r => S.role && RANK[S.role] >= RANK[r];
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const EMOJIS = ['🏕️','🏖️','🏔️','🌲','🚲','⛵','🏰','🎡','🎉','🍽️','🏡','🚗','⛷️','🦆','☀️','❤️'];
+
+function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200)}
+
+async function api(method, url, data){
+  const opt = {method, credentials:'same-origin', headers:{}};
+  if (data !== undefined){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(data)}
+  const r = await fetch(url, opt);
+  let j = {}; try{ j = await r.json() }catch(e){}
+  if (r.status === 401 && j.error === 'auth'){ S.role=null; showPin(); throw Object.assign(new Error(j.message), {silent:true}); }
+  if (!r.ok) throw Object.assign(new Error(j.message || 'Er ging iets mis'), {status:r.status, data:j});
+  return j;
+}
+function fail(e){ if(!e.silent) toast(e.message) }
+
+/* ---------- datum ---------- */
+function d(s){ return s ? new Date(s+'T00:00:00') : null }
+function fmtDay(s, long){ const x=d(s); if(!x||isNaN(x)) return s||'';
+  return x.toLocaleDateString('nl-NL', long?{weekday:'long',day:'numeric',month:'long'}:{weekday:'short',day:'numeric',month:'short'}) }
+function fmtRange(a,b){
+  if(!a && !b) return 'Datum nog niet bekend';
+  if(a && b && a!==b) return fmtDay(a)+' – '+fmtDay(b)+' '+d(b).getFullYear();
+  const x=a||b; return fmtDay(x, true)+' '+d(x).getFullYear();
+}
+function localDays(a,b){ const out=[]; if(!a) return out; let x=d(a), e=d(b||a), n=0;
+  while(x<=e && n<31){ const y=x.getFullYear(), m=String(x.getMonth()+1).padStart(2,'0'), dd=String(x.getDate()).padStart(2,'0');
+    out.push(`${y}-${m}-${dd}`); x.setDate(x.getDate()+1); n++ } return out }
+
+/* ---------- PIN-scherm ---------- */
+let pinBuf = '', lockTimer = null;
+function showPin(){
+  $('#appView').classList.add('hidden'); $('#pinView').classList.remove('hidden');
+  $('#pinTitle').textContent = S.title; document.title = S.title;
+  pinBuf=''; renderDots(); buildKeypad();
+}
+function buildKeypad(){
+  const keys=['1','2','3','4','5','6','7','8','9','⌫','0','OK'];
+  $('#keypad').innerHTML = keys.map(k=>`<button type="button" class="${k==='OK'?'ok':k==='⌫'?'ghost':''}" data-k="${k}">${k}</button>`).join('');
+  $('#keypad').querySelectorAll('button').forEach(b=>b.onclick=()=>pinKey(b.dataset.k));
+}
+function renderDots(){
+  const n = Math.max(4, pinBuf.length);
+  $('#dots').innerHTML = Array.from({length:n},(_,i)=>`<span class="${i<pinBuf.length?'on':''}"></span>`).join('');
+}
+function pinKey(k){
+  if (lockTimer) return;
+  if (k==='⌫') pinBuf = pinBuf.slice(0,-1);
+  else if (k==='OK') return submitPin();
+  else if (pinBuf.length < 8) pinBuf += k;
+  renderDots();
+}
+document.addEventListener('keydown', e=>{
+  if ($('#pinView').classList.contains('hidden') || $('#modalRoot').firstChild) return;
+  if (/^[0-9]$/.test(e.key)) pinKey(e.key);
+  else if (e.key==='Backspace') pinKey('⌫');
+  else if (e.key==='Enter') pinKey('OK');
+});
+function setLocked(sec){
+  const msg=$('#pinMsg'); const btns=$('#keypad').querySelectorAll('button');
+  btns.forEach(b=>b.disabled=true); clearInterval(lockTimer);
+  const end = Date.now()+sec*1000;
+  const tick=()=>{ const left=Math.ceil((end-Date.now())/1000);
+    if(left<=0){ clearInterval(lockTimer); lockTimer=null; btns.forEach(b=>b.disabled=false); msg.className='pinmsg info'; msg.textContent='Je kunt het opnieuw proberen.'; return }
+    const m=Math.floor(left/60), s=String(left%60).padStart(2,'0');
+    msg.className='pinmsg'; msg.textContent=`🔒 Vergrendeld. Probeer opnieuw over ${m}:${s}`;
+  };
+  tick(); lockTimer=setInterval(tick,1000);
+}
+async function submitPin(){
+  if (pinBuf.length < 4){ $('#pinMsg').className='pinmsg'; $('#pinMsg').textContent='Een pincode heeft minimaal 4 cijfers.'; return }
+  const pin = pinBuf; pinBuf=''; renderDots();
+  try{
+    await api('POST','/api/login',{pin});
+    $('#pinMsg').textContent=''; await boot();
+  }catch(e){
+    if (e.status===423) setLocked(e.data.seconds||600);
+    else { $('#pinMsg').className='pinmsg';
+      $('#pinMsg').textContent = e.message + (e.data && e.data.remaining!=null ? ` Nog ${e.data.remaining} ${e.data.remaining===1?'poging':'pogingen'}.` : ''); }
+  }
+}
+async function logout(){ await api('POST','/api/logout').catch(()=>{}); S.role=null; showPin() }
+
+/* ---------- navigatie ---------- */
+async function boot(){
+  const me = await api('GET','/api/me');
+  S.title = me.title; S.role = me.role; S.adminDefault = me.admin_default;
+  document.title = S.title;
+  if (!S.role) return showPin();
+  $('#pinView').classList.add('hidden'); $('#appView').classList.remove('hidden');
+  $('#appTitle').textContent = S.title;
+  $('#roleBadge').textContent = S.role;
+  $('#btnSettings').classList.toggle('hidden', S.role!=='admin');
+  const h = location.hash.match(/^#uitje\/(\d+)/);
+  if (location.hash==='#instellingen' && S.role==='admin') go('settings');
+  else if (h) go('event', +h[1]); else go('list');
+}
+async function go(view, id){
+  S.view = view;
+  try{
+    if (view==='list'){ history.replaceState(null,'','#'); await renderList() }
+    if (view==='event'){ history.replaceState(null,'','#uitje/'+id); await loadEvent(id) }
+    if (view==='settings'){ history.replaceState(null,'','#instellingen'); await renderSettings() }
+    window.scrollTo(0,0);
+  }catch(e){ fail(e); if(view!=='list') go('list') }
+}
+
+/* ---------- uitjes-overzicht ---------- */
+async function renderList(){
+  const evs = await api('GET','/api/events');
+  const today = new Date().toISOString().slice(0,10);
+  const card = e => `<div class="card ecard" onclick="go('event',${e.id})">
+      <div class="emo">${esc(e.emoji||'🏕️')}</div>
+      <h3>${esc(e.title)}</h3>
+      <div class="meta">📅 ${esc(fmtRange(e.start_date,e.end_date))}</div>
+      ${e.location_name?`<div class="meta">📍 ${esc(e.location_name)}</div>`:''}
+      <div class="meta">🗓️ ${e.items} ${e.items===1?'onderdeel':'onderdelen'} in de planning</div>
+    </div>`;
+  const upcoming = evs.filter(e=>!(e.end_date||e.start_date) || (e.end_date||e.start_date) >= today);
+  const past = evs.filter(e=>!upcoming.includes(e));
+  $('#main').innerHTML = `
+    ${S.adminDefault?`<div class="notice">⚠️ De admin gebruikt nog de standaard pincode <b>1234</b>. Wijzig deze via <a href="#" onclick="go('settings');return false">Instellingen</a>.</div>`:''}
+    <div class="row"><h2>Kies een uitje</h2><span class="spacer"></span>
+      ${can('admin')?`<button class="btn primary" onclick="editEvent()">＋ Nieuw uitje</button>`:''}</div>
+    ${evs.length===0?`<div class="card empty" style="margin-top:16px"><div class="big">🧺</div>
+       <p>Er zijn nog geen uitjes.${can('admin')?' Maak het eerste uitje aan!':' De admin kan er een aanmaken.'}</p></div>`:''}
+    ${upcoming.length?`<div class="grid">${upcoming.map(card).join('')}</div>`:''}
+    ${past.length?`<div class="section-title"><h3 class="muted">Eerdere uitjes</h3></div><div class="grid">${past.map(card).join('')}</div>`:''}`;
+}
+
+/* ---------- uitje detail ---------- */
+async function loadEvent(id){ S.event = await api('GET','/api/events/'+id); renderEvent() }
+async function reload(){ try{ await loadEvent(S.event.id) }catch(e){ fail(e) } }
+
+function renderEvent(){
+  const e = S.event, edit = can('planner');
+  $('#main').innerHTML = `
+    <div class="row" style="margin-bottom:14px"><button class="btn sm" onclick="go('list')">← Alle uitjes</button>
+      <span class="spacer"></span>
+      ${edit?`<button class="btn sm" onclick="editEvent(S.event)">✏️ Bewerken</button>`:''}
+      ${can('admin')?`<button class="btn sm danger" onclick="deleteEvent()">🗑️ Verwijderen</button>`:''}</div>
+    <div class="card hero">
+      <div class="emo">${esc(e.emoji||'🏕️')}</div>
+      <div style="flex:1;min-width:0">
+        <h2>${esc(e.title)}</h2>
+        <div class="muted">📅 ${esc(fmtRange(e.start_date,e.end_date))}${e.location_name?` · 📍 ${esc(e.location_name)}`:''}</div>
+        ${e.description?`<div class="desc">${esc(e.description)}</div>`:''}
+      </div>
+    </div>
+    <div class="tabs">
+      ${[['planning','🗓️ Planning'],['locatie','📍 Locatie'],['gegevens','📋 Gegevens']].map(([k,l])=>
+        `<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';renderEvent()">${l}</button>`).join('')}
+    </div>
+    <div id="tabBody">${S.tab==='planning'?tabPlanning():S.tab==='locatie'?tabLocatie():tabGegevens()}</div>`;
+}
+
+function tabPlanning(){
+  const e=S.event, edit=can('planner');
+  const groups={};
+  e.planning.forEach(p=>{ (groups[p.day||'']=groups[p.day||'']||[]).push(p) });
+  const keys=Object.keys(groups).sort((a,b)=> a===''?1:b===''?-1:a.localeCompare(b));
+  const time=p=> p.time_start ? esc(p.time_start)+(p.time_end?' – '+esc(p.time_end):'') : '<span class="muted">—</span>';
+  return `
+    ${edit?`<div class="row" style="margin-bottom:14px"><span class="spacer"></span><button class="btn primary" onclick="editPlan()">＋ Onderdeel toevoegen</button></div>`:''}
+    ${keys.length===0?`<div class="card empty"><div class="big">🗓️</div><p>Nog geen planning.</p></div>`:''}
+    ${keys.map(k=>`<div class="day"><h4>${k?esc(fmtDay(k,true)):'Dag nog niet bepaald'}</h4>
+      ${groups[k].map(p=>`<div class="pitem">
+        <div class="time">${time(p)}</div>
+        <div class="what"><b>${esc(p.activity)}</b>
+          ${p.who?`<div class="who">👤 ${esc(p.who)}</div>`:''}
+          ${p.notes?`<div class="notes">${esc(p.notes)}</div>`:''}</div>
+        ${edit?`<div class="acts"><button class="icon-btn" title="Bewerken" onclick="editPlan(${p.id})">✏️</button>
+          <button class="icon-btn" title="Verwijderen" onclick="delItem('planning',${p.id})">🗑️</button></div>`:''}
+      </div>`).join('')}</div>`).join('')}`;
+}
+
+function tabLocatie(){
+  const e=S.event, edit=can('planner');
+  const q = [e.location_name, e.address].filter(Boolean).join(', ');
+  return `<div class="card loc">
+    <div class="row"><h3 style="flex:1">${esc(e.location_name||'Nog geen locatie')}</h3>
+      ${edit?`<button class="btn sm" onclick="editLocation()">✏️ Locatie bewerken</button>`:''}</div>
+    ${e.address?`<div class="pre" style="margin-top:6px">${esc(e.address)}</div>`:''}
+    ${q?`<div class="row" style="margin-top:10px">
+      <a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}">🗺️ Open in Google Maps</a>
+      <a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}">🚗 Route plannen</a></div>
+      <iframe class="map" loading="lazy" referrerpolicy="no-referrer" src="https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=14&output=embed"></iframe>`:''}
+    ${e.location_notes?`<div class="section-title"><h3>Praktische info</h3></div><div class="pre">${esc(e.location_notes)}</div>`:''}
+  </div>`;
+}
+
+function tabGegevens(){
+  const e=S.event, edit=can('planner');
+  return `
+    <div class="section-title" style="margin-top:0"><h3>👥 Contactpersonen</h3>
+      ${edit?`<button class="btn sm primary" onclick="editContact()">＋ Contact</button>`:''}</div>
+    ${e.contacts.length===0?`<p class="muted">Nog geen contactpersonen.</p>`:`
+    <div class="card" style="padding:6px 10px"><table class="contacts"><thead><tr><th>Naam</th><th>Rol / taak</th><th>Telefoon</th><th>E-mail</th><th>Opmerking</th>${edit?'<th></th>':''}</tr></thead><tbody>
+    ${e.contacts.map(c=>`<tr>
+      <td><b>${esc(c.name)}</b></td><td>${esc(c.role)}</td>
+      <td>${c.phone?`<a href="tel:${esc(c.phone.replace(/[^+\d]/g,''))}">${esc(c.phone)}</a>`:''}</td>
+      <td>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}</td>
+      <td class="pre">${esc(c.notes)}</td>
+      ${edit?`<td style="white-space:nowrap"><button class="icon-btn" onclick="editContact(${c.id})">✏️</button><button class="icon-btn" onclick="delItem('contacts',${c.id})">🗑️</button></td>`:''}
+    </tr>`).join('')}</tbody></table></div>`}
+    <div class="section-title"><h3>📋 Overige gegevens</h3>
+      ${edit?`<button class="btn sm" onclick="editDetails()">✏️ Bewerken</button>`:''}</div>
+    <div class="card pre">${e.details?esc(e.details):'<span class="muted">Bijvoorbeeld: kosten en verdeling, inpaklijst, wifi-code, sleutelafspraken, huisregels…</span>'}</div>`;
+}
+
+/* ---------- modal ---------- */
+function modal({title, fields, submit, onSubmit, intro}){
+  const root=$('#modalRoot');
+  const f = fld => {
+    const v = esc(fld.value ?? '');
+    if (fld.type==='emoji') return `<label class="lbl">${fld.label}</label><div class="emoji-pick" data-name="${fld.name}">
+      ${EMOJIS.map(x=>`<button type="button" class="${x===(fld.value||EMOJIS[0])?'on':''}">${x}</button>`).join('')}</div>`;
+    if (fld.type==='textarea') return `<label class="lbl">${fld.label}</label><textarea class="field" name="${fld.name}" rows="${fld.rows||4}" placeholder="${esc(fld.ph||'')}">${v}</textarea>`;
+    if (fld.type==='select') return `<label class="lbl">${fld.label}</label><select class="field" name="${fld.name}">${fld.options.map(([ov,ol])=>`<option value="${esc(ov)}" ${ov===fld.value?'selected':''}>${esc(ol)}</option>`).join('')}</select>`;
+    return `<label class="lbl">${fld.label}</label><input class="field" name="${fld.name}" type="${fld.type||'text'}" value="${v}" placeholder="${esc(fld.ph||'')}" ${fld.required?'required':''}>`;
+  };
+  const body = fields.map(x => Array.isArray(x) ? `<div class="two">${x.map(y=>`<div>${f(y)}</div>`).join('')}</div>` : f(x)).join('');
+  root.innerHTML = `<div class="modal-bg"><form class="modal" autocomplete="off">
+    <h3>${esc(title)}</h3>${intro?`<p class="help">${intro}</p>`:''}${body}
+    <div class="error"></div>
+    <div class="acts"><button type="button" class="btn" data-x>Annuleren</button><button class="btn primary">${esc(submit||'Opslaan')}</button></div>
+  </form></div>`;
+  const form=root.querySelector('form'), close=()=>root.innerHTML='';
+  root.querySelector('[data-x]').onclick=close;
+  root.querySelector('.modal-bg').onclick=ev=>{ if(ev.target.classList.contains('modal-bg')) close() };
+  form.querySelectorAll('.emoji-pick').forEach(p=>p.querySelectorAll('button').forEach(b=>b.onclick=()=>{
+    p.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on') }));
+  const first=form.querySelector('input,textarea'); if(first) setTimeout(()=>first.focus(),50);
+  form.onsubmit=async ev=>{
+    ev.preventDefault();
+    const vals={}; form.querySelectorAll('[name]').forEach(i=>vals[i.name]=i.value.trim());
+    form.querySelectorAll('.emoji-pick').forEach(p=>vals[p.dataset.name]=p.querySelector('.on')?.textContent||'');
+    try{ await onSubmit(vals); close() }catch(e){ form.querySelector('.error').textContent=e.message }
+  };
+}
+
+/* ---------- acties ---------- */
+function editEvent(e){
+  modal({ title: e?'Uitje bewerken':'Nieuw uitje',
+    fields:[
+      {name:'title',label:'Naam van het uitje',value:e?.title,required:true,ph:'Bijv. Familieweekend Veluwe'},
+      {name:'emoji',label:'Pictogram',type:'emoji',value:e?.emoji},
+      [{name:'start_date',label:'Van',type:'date',value:e?.start_date},{name:'end_date',label:'Tot en met',type:'date',value:e?.end_date}],
+      {name:'description',label:'Korte omschrijving',type:'textarea',rows:3,value:e?.description},
+      ...(e?[]:[{name:'location_name',label:'Locatie (optioneel)',value:'',ph:'Bijv. Vakantiepark De Boshoek'}])
+    ],
+    submit: e?'Opslaan':'Aanmaken',
+    onSubmit: async v=>{
+      if (v.start_date && v.end_date && v.end_date < v.start_date) throw new Error('De einddatum ligt vóór de begindatum.');
+      if (e){ await api('PUT','/api/events/'+e.id,v); toast('Opgeslagen'); reload() }
+      else { const r=await api('POST','/api/events',v); toast('Uitje aangemaakt'); S.tab='planning'; go('event',r.id) }
+    }});
+}
+async function deleteEvent(){
+  if(!confirm(`Uitje "${S.event.title}" met alle planning en gegevens definitief verwijderen?`)) return;
+  try{ await api('DELETE','/api/events/'+S.event.id); toast('Uitje verwijderd'); go('list') }catch(e){ fail(e) }
+}
+function editLocation(){
+  const e=S.event;
+  modal({title:'Locatie bewerken', fields:[
+      {name:'location_name',label:'Naam locatie',value:e.location_name,ph:'Bijv. Vakantiepark De Boshoek, huisje 12'},
+      {name:'address',label:'Adres',type:'textarea',rows:2,value:e.address,ph:'Straat 1, 1234 AB Plaats'},
+      {name:'location_notes',label:'Praktische info',type:'textarea',rows:5,value:e.location_notes,ph:'Parkeren, inchecktijden, sleutelkastje, aantal slaapkamers…'}],
+    onSubmit: async v=>{ await api('PUT','/api/events/'+e.id,v); toast('Locatie opgeslagen'); reload() }});
+}
+function editDetails(){
+  const e=S.event;
+  modal({title:'Overige gegevens', fields:[{name:'details',label:'Gegevens',type:'textarea',rows:12,value:e.details,
+      ph:'Kosten & verdeling\nInpaklijst\nWifi-code\nHuisregels…'}],
+    onSubmit: async v=>{ await api('PUT','/api/events/'+e.id,v); toast('Opgeslagen'); reload() }});
+}
+function editPlan(id){
+  const e=S.event, p=id?e.planning.find(x=>x.id===id):null;
+  const days=localDays(e.start_date,e.end_date);
+  const dayField = days.length
+    ? {name:'day',label:'Dag',type:'select',value:p?.day ?? days[0],options:[...days.map(x=>[x,fmtDay(x,true)]),['','Nog niet bepaald']]}
+    : {name:'day',label:'Dag',type:'date',value:p?.day};
+  modal({title:p?'Onderdeel bewerken':'Onderdeel toevoegen', fields:[
+      dayField,
+      [{name:'time_start',label:'Begintijd',type:'time',value:p?.time_start},{name:'time_end',label:'Eindtijd',type:'time',value:p?.time_end}],
+      {name:'activity',label:'Activiteit',value:p?.activity,required:true,ph:'Bijv. Fietstocht door de bossen'},
+      {name:'who',label:'Wie / verantwoordelijk',value:p?.who,ph:'Bijv. iedereen, of: Oma & opa koken'},
+      {name:'notes',label:'Opmerkingen',type:'textarea',rows:3,value:p?.notes}],
+    submit:p?'Opslaan':'Toevoegen',
+    onSubmit: async v=>{
+      if (p) await api('PUT','/api/planning/'+p.id,v); else await api('POST',`/api/events/${e.id}/planning`,v);
+      toast('Planning bijgewerkt'); reload() }});
+}
+function editContact(id){
+  const e=S.event, c=id?e.contacts.find(x=>x.id===id):null;
+  modal({title:c?'Contact bewerken':'Contact toevoegen', fields:[
+      {name:'name',label:'Naam',value:c?.name,required:true},
+      {name:'role',label:'Rol / taak',value:c?.role,ph:'Bijv. Verhuurder, chauffeur, kok'},
+      [{name:'phone',label:'Telefoon',type:'tel',value:c?.phone},{name:'email',label:'E-mail',type:'email',value:c?.email}],
+      {name:'notes',label:'Opmerking',type:'textarea',rows:2,value:c?.notes,ph:'Bijv. allergie, aankomsttijd'}],
+    submit:c?'Opslaan':'Toevoegen',
+    onSubmit: async v=>{
+      if (c) await api('PUT','/api/contacts/'+c.id,v); else await api('POST',`/api/events/${e.id}/contacts`,v);
+      toast('Contact opgeslagen'); reload() }});
+}
+async function delItem(kind,id){
+  if(!confirm('Weet je zeker dat je dit wilt verwijderen?')) return;
+  try{ await api('DELETE',`/api/${kind}/${id}`); toast('Verwijderd'); reload() }catch(e){ fail(e) }
+}
+
+/* ---------- instellingen (admin) ---------- */
+async function renderSettings(){
+  const s = await api('GET','/api/admin/settings');
+  S.adminDefault = s.admin_default;
+  const roleInfo = {admin:'Alles beheren, uitjes aanmaken en instellingen', planner:'Uitjes bewerken: planning, locatie en gegevens', lezer:'Alleen uitjes inzien'};
+  const fmtLock = l => l.seconds>0 ? `vergrendeld, nog ${Math.floor(l.seconds/60)}:${String(l.seconds%60).padStart(2,'0')}` : `${l.fails} foute ${l.fails===1?'poging':'pogingen'}`;
+  $('#main').innerHTML = `
+    <div class="row" style="margin-bottom:14px"><button class="btn sm" onclick="go('list')">← Alle uitjes</button></div>
+    <h2>⚙️ Instellingen</h2>
+    ${s.admin_default?`<div class="notice" style="margin-top:14px">⚠️ De admin gebruikt nog de standaard pincode <b>1234</b>. Stel hieronder een eigen pincode in.</div>`:''}
+    <div class="setgrid">
+      <div class="card"><h3 style="margin-top:0">🔑 Pincodes per rol</h3>
+        <p class="help">Elke rol heeft een eigen pincode van 4 t/m 8 cijfers. Wie inlogt krijgt automatisch de rol die bij de pincode hoort, dus de pincodes moeten verschillend zijn. Na het wijzigen worden ingelogde gebruikers van die rol uitgelogd.</p>
+        ${['admin','planner','lezer'].map(r=>`<div class="pinrow">
+          <div><div class="rname">${r}</div></div>
+          <div class="st ${s.pins[r]?'ok-t':'no-t'}">${s.pins[r]?'✓ ingesteld':'niet ingesteld'}</div>
+          <input class="field" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="8" placeholder="Nieuwe pincode" id="pin_${r}">
+          <button class="btn sm primary" onclick="savePin('${r}')">Opslaan</button>
+          ${r!=='admin'&&s.pins[r]?`<button class="btn sm danger" onclick="removePin('${r}')">Uitschakelen</button>`:''}
+          <div class="help" style="width:100%">${roleInfo[r]}</div>
+        </div>`).join('')}
+      </div>
+      <div class="card"><h3 style="margin-top:0">🛡️ Beveiliging</h3>
+        <div class="two" style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div><label class="lbl">Max. foute pogingen</label><input class="field" type="number" min="1" max="50" id="maxAtt" value="${s.max_attempts}"></div>
+          <div><label class="lbl">Vergrendeltijd (minuten)</label><input class="field" type="number" min="1" max="1440" id="lockMin" value="${s.lockout_minutes}"></div>
+        </div>
+        <p class="help">Na het maximale aantal foute pogingen wordt de pincode-invoer op dat apparaat vergrendeld.</p>
+        <button class="btn primary" onclick="saveSecurity()">Opslaan</button>
+        <div class="section-title"><h3>Vergrendelingen</h3>
+          ${s.locks.length?`<button class="btn sm" onclick="clearLocks()">🔓 Alles vrijgeven</button>`:''}</div>
+        ${s.locks.length?s.locks.map(l=>`<div class="row" style="padding:4px 0"><code>${esc(l.ip)}</code><span class="muted">${fmtLock(l)}</span></div>`).join(''):'<p class="muted" style="margin:0">Geen actieve vergrendelingen.</p>'}
+      </div>
+      <div class="card"><h3 style="margin-top:0">🏷️ Algemeen</h3>
+        <label class="lbl">Titel van de site</label>
+        <div class="row"><input class="field" id="siteTitle" value="${esc(s.title)}" maxlength="80" style="flex:1;min-width:200px">
+        <button class="btn primary" onclick="saveTitle()">Opslaan</button></div>
+      </div>
+    </div>`;
+}
+async function savePin(r){
+  const v=$('#pin_'+r).value.trim();
+  if(!/^\d{4,8}$/.test(v)) return toast('Een pincode bestaat uit 4 t/m 8 cijfers.');
+  try{ await api('PUT','/api/admin/pin',{role:r,pin:v}); toast(`Pincode voor ${r} opgeslagen`); renderSettings() }catch(e){ fail(e) }
+}
+async function removePin(r){
+  if(!confirm(`Pincode voor ${r} uitschakelen? Niemand kan dan nog als ${r} inloggen.`)) return;
+  try{ await api('DELETE','/api/admin/pin/'+r); toast('Uitgeschakeld'); renderSettings() }catch(e){ fail(e) }
+}
+async function saveSecurity(){
+  try{ await api('PUT','/api/admin/settings',{max_attempts:+$('#maxAtt').value,lockout_minutes:+$('#lockMin').value}); toast('Beveiliging opgeslagen') }catch(e){ fail(e) }
+}
+async function clearLocks(){ try{ await api('DELETE','/api/admin/locks'); toast('Vergrendelingen vrijgegeven'); renderSettings() }catch(e){ fail(e) } }
+async function saveTitle(){
+  try{ const t=$('#siteTitle').value.trim(); await api('PUT','/api/admin/settings',{title:t});
+    S.title=t; $('#appTitle').textContent=t; document.title=t; toast('Titel opgeslagen') }catch(e){ fail(e) }
+}
+
+boot().catch(()=>showPin());
+</script>
+</body>
+</html>
