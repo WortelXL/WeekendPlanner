@@ -31,6 +31,7 @@ a{color:var(--brand)}
 .pinbox{width:100%;max-width:340px;text-align:center}
 .pinbox .logo{font-size:56px;line-height:1}
 .pinbox h1{margin:8px 0 2px;font-size:26px}
+.ver{font-size:12px;color:var(--muted);text-align:center;margin-top:24px;opacity:.8}
 .pinbox p.sub{margin:0 0 22px;color:var(--muted)}
 .dots{display:flex;justify-content:center;gap:12px;height:22px;margin-bottom:10px}
 .dots span{width:16px;height:16px;border-radius:50%;border:2px solid var(--brand);transition:.15s}
@@ -143,6 +144,39 @@ label.lbl{display:block;font-size:14px;font-weight:600;margin:10px 0 4px}
 .emoji-pick button{font-size:24px;border:1px solid var(--line);background:var(--bg);border-radius:10px;width:44px;height:44px;cursor:pointer}
 .emoji-pick button.on{border-color:var(--brand);background:var(--brand-soft)}
 
+/* status */
+.status{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;white-space:nowrap}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.st-concept{background:#eceae4;color:#6b6656}
+.st-gepland{background:#e2ecf7;color:#2c5d8f}
+.st-gaande{background:#fdebd8;color:#b2590f}
+@media (prefers-color-scheme: dark){
+  .st-concept{background:#2e2c27;color:#bdb6a2}.st-gepland{background:#1f2c3a;color:#8fb8e3}.st-gaande{background:#3a2a1a;color:#f0a560}}
+.ecard.gaande{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent),var(--shadow)}
+.ecard.concept{opacity:.85}
+.ecard .top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.chips button{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:5px 13px;cursor:pointer;font-size:14px}
+.chips button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.chips .n{opacity:.7;margin-left:3px}
+select.status-sel{border:1px solid var(--line);border-radius:99px;padding:3px 8px;font-size:13px;background:var(--card)}
+
+/* dagplanning */
+.daytabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:6px;margin-bottom:14px;scrollbar-width:thin}
+.daytabs button{flex:0 0 auto;border:1px solid var(--line);background:var(--card);border-radius:12px;padding:8px 14px;cursor:pointer;text-align:left;line-height:1.25}
+.daytabs button small{display:block;color:var(--muted);font-size:12px}
+.daytabs button.on{background:var(--brand);border-color:var(--brand);color:#fff}
+.daytabs button.on small{color:rgba(255,255,255,.8)}
+.daytabs .cnt{font-size:11px;background:rgba(0,0,0,.08);border-radius:99px;padding:0 6px;margin-left:4px}
+.dayhead{display:flex;gap:12px;align-items:flex-start;margin-bottom:14px}
+.dayhead h3{margin:0;font-size:20px;text-transform:capitalize}
+.dayhead .thema{color:var(--brand);font-weight:600;margin-top:2px}
+.dayhead .notes{white-space:pre-wrap;margin-top:6px}
+.timeline{position:relative;margin-left:8px;padding-left:22px;border-left:2px solid var(--line)}
+.timeline .pitem{position:relative}
+.timeline .pitem::before{content:"";position:absolute;left:-30px;top:18px;width:12px;height:12px;border-radius:50%;background:var(--brand);border:3px solid var(--bg)}
+.timeline .pitem.now::before{background:var(--accent)}
+
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);
   padding:10px 16px;border-radius:10px;z-index:60;font-size:15px;opacity:0;transition:.2s;pointer-events:none}
 #toast.show{opacity:1}
@@ -159,6 +193,7 @@ label.lbl{display:block;font-size:14px;font-weight:600;margin:10px 0 4px}
     <div class="dots" id="dots"></div>
     <div class="pinmsg" id="pinMsg"></div>
     <div class="keypad" id="keypad"></div>
+    <div class="ver" id="pinVer"></div>
   </div>
 </section>
 
@@ -171,6 +206,7 @@ label.lbl{display:block;font-size:14px;font-weight:600;margin:10px 0 4px}
     <button class="hbtn" onclick="logout()" title="Uitloggen">Uitloggen</button>
   </div></header>
   <main id="main"></main>
+  <div class="ver" id="appVer" style="padding-bottom:24px"></div>
 </section>
 
 <div id="modalRoot"></div>
@@ -178,11 +214,15 @@ label.lbl{display:block;font-size:14px;font-weight:600;margin:10px 0 4px}
 
 <script>
 "use strict";
-const S = {role:null, title:'Familieweekend', adminDefault:false, view:'list', event:null, tab:'planning'};
+const S = {role:null, title:'Familieweekend', adminDefault:false, view:'list', event:null, tab:'planning', day:null, filter:'alle'};
 const RANK = {lezer:1, planner:2, admin:3};
 const can = r => S.role && RANK[S.role] >= RANK[r];
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const STATUS = {gaande:'Gaande', gepland:'Gepland', concept:'Concept'};
+const STATUS_ORDER = {gaande:0, gepland:1, concept:2};
+const statusBadge = st => `<span class="status st-${esc(st||'concept')}">${esc(STATUS[st]||'Concept')}</span>`;
+const todayStr = () => { const x=new Date(); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}` };
 const EMOJIS = ['🏕️','🏖️','🏔️','🌲','🚲','⛵','🏰','🎡','🎉','🍽️','🏡','🚗','⛷️','🦆','☀️','❤️'];
 
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200)}
@@ -269,6 +309,7 @@ async function logout(){ await api('POST','/api/logout').catch(()=>{}); S.role=n
 async function boot(){
   const me = await api('GET','/api/me');
   S.title = me.title; S.role = me.role; S.adminDefault = me.admin_default;
+  ['#pinVer','#appVer'].forEach(x=>$(x).textContent = me.version ? 'Weekendplanner v'+me.version : '');
   document.title = S.title;
   if (!S.role) return showPin();
   $('#pinView').classList.add('hidden'); $('#appView').classList.remove('hidden');
@@ -292,20 +333,26 @@ async function go(view, id){
 /* ---------- uitjes-overzicht ---------- */
 async function renderList(){
   const evs = await api('GET','/api/events');
-  const today = new Date().toISOString().slice(0,10);
-  const card = e => `<div class="card ecard" onclick="go('event',${e.id})">
-      <div class="emo">${esc(e.emoji||'🏕️')}</div>
+  const today = todayStr();
+  evs.sort((a,b)=> (STATUS_ORDER[a.status]??3)-(STATUS_ORDER[b.status]??3));
+  const counts = {alle:evs.length}; Object.keys(STATUS).forEach(k=>counts[k]=evs.filter(e=>e.status===k).length);
+  if (S.filter!=='alle' && !counts[S.filter]) S.filter='alle';
+  const shown = S.filter==='alle' ? evs : evs.filter(e=>e.status===S.filter);
+  const card = e => `<div class="card ecard ${esc(e.status)}" onclick="S.tab='${e.status==='gaande'?'dag':'planning'}';S.day=null;go('event',${e.id})">
+      <div class="top"><div class="emo">${esc(e.emoji||'🏕️')}</div>${statusBadge(e.status)}</div>
       <h3>${esc(e.title)}</h3>
       <div class="meta">📅 ${esc(fmtRange(e.start_date,e.end_date))}</div>
       ${e.location_name?`<div class="meta">📍 ${esc(e.location_name)}</div>`:''}
       <div class="meta">🗓️ ${e.items} ${e.items===1?'onderdeel':'onderdelen'} in de planning</div>
     </div>`;
-  const upcoming = evs.filter(e=>!(e.end_date||e.start_date) || (e.end_date||e.start_date) >= today);
-  const past = evs.filter(e=>!upcoming.includes(e));
+  const isPast = e => e.status!=='gaande' && (e.end_date||e.start_date) && (e.end_date||e.start_date) < today;
+  const upcoming = shown.filter(e=>!isPast(e)), past = shown.filter(isPast);
   $('#main').innerHTML = `
     ${S.adminDefault?`<div class="notice">⚠️ De admin gebruikt nog de standaard pincode <b>1234</b>. Wijzig deze via <a href="#" onclick="go('settings');return false">Instellingen</a>.</div>`:''}
     <div class="row"><h2>Kies een uitje</h2><span class="spacer"></span>
       ${can('admin')?`<button class="btn primary" onclick="editEvent()">＋ Nieuw uitje</button>`:''}</div>
+    ${evs.length?`<div class="chips">${[['alle','Alle'],['gaande','Gaande'],['gepland','Gepland'],['concept','Concept']].map(([k,l])=>
+      `<button class="${S.filter===k?'on':''}" onclick="S.filter='${k}';renderList()">${l}<span class="n">${counts[k]}</span></button>`).join('')}</div>`:''}
     ${evs.length===0?`<div class="card empty" style="margin-top:16px"><div class="big">🧺</div>
        <p>Er zijn nog geen uitjes.${can('admin')?' Maak het eerste uitje aan!':' De admin kan er een aanmaken.'}</p></div>`:''}
     ${upcoming.length?`<div class="grid">${upcoming.map(card).join('')}</div>`:''}
@@ -326,16 +373,18 @@ function renderEvent(){
     <div class="card hero">
       <div class="emo">${esc(e.emoji||'🏕️')}</div>
       <div style="flex:1;min-width:0">
-        <h2>${esc(e.title)}</h2>
+        <div class="row" style="gap:8px"><h2>${esc(e.title)}</h2>
+          ${edit?`<select class="status-sel st-${esc(e.status)}" onchange="setStatus(this.value)" title="Status van het uitje">
+            ${Object.entries(STATUS).map(([k,l])=>`<option value="${k}" ${e.status===k?'selected':''}>${l}</option>`).join('')}</select>`:statusBadge(e.status)}</div>
         <div class="muted">📅 ${esc(fmtRange(e.start_date,e.end_date))}${e.location_name?` · 📍 ${esc(e.location_name)}`:''}</div>
         ${e.description?`<div class="desc">${esc(e.description)}</div>`:''}
       </div>
     </div>
     <div class="tabs">
-      ${[['planning','🗓️ Planning'],['locatie','📍 Locatie'],['gegevens','📋 Gegevens']].map(([k,l])=>
+      ${[['planning','🗓️ Planning'],['dag','📆 Dagplanning'],['locatie','📍 Locatie'],['gegevens','📋 Gegevens']].map(([k,l])=>
         `<button class="${S.tab===k?'on':''}" onclick="S.tab='${k}';renderEvent()">${l}</button>`).join('')}
     </div>
-    <div id="tabBody">${S.tab==='planning'?tabPlanning():S.tab==='locatie'?tabLocatie():tabGegevens()}</div>`;
+    <div id="tabBody">${S.tab==='planning'?tabPlanning():S.tab==='dag'?tabDag():S.tab==='locatie'?tabLocatie():tabGegevens()}</div>`;
 }
 
 function tabPlanning(){
@@ -347,7 +396,7 @@ function tabPlanning(){
   return `
     ${edit?`<div class="row" style="margin-bottom:14px"><span class="spacer"></span><button class="btn primary" onclick="editPlan()">＋ Onderdeel toevoegen</button></div>`:''}
     ${keys.length===0?`<div class="card empty"><div class="big">🗓️</div><p>Nog geen planning.</p></div>`:''}
-    ${keys.map(k=>`<div class="day"><h4>${k?esc(fmtDay(k,true)):'Dag nog niet bepaald'}</h4>
+    ${keys.map(k=>`<div class="day"><h4>${k?`<a href="#" onclick="openDay('${esc(k)}');return false">${esc(fmtDay(k,true))}</a>${e.days?.[k]?.title?` · <span class="muted">${esc(e.days[k].title)}</span>`:''}`:'Dag nog niet bepaald'}</h4>
       ${groups[k].map(p=>`<div class="pitem">
         <div class="time">${time(p)}</div>
         <div class="what"><b>${esc(p.activity)}</b>
@@ -356,6 +405,61 @@ function tabPlanning(){
         ${edit?`<div class="acts"><button class="icon-btn" title="Bewerken" onclick="editPlan(${p.id})">✏️</button>
           <button class="icon-btn" title="Verwijderen" onclick="delItem('planning',${p.id})">🗑️</button></div>`:''}
       </div>`).join('')}</div>`).join('')}`;
+}
+
+function openDay(k){ S.tab='dag'; S.day=k; renderEvent(); window.scrollTo(0,0) }
+function eventDays(){
+  const e=S.event, set=new Set(localDays(e.start_date,e.end_date));
+  e.planning.forEach(p=>{ if(p.day) set.add(p.day) });
+  const list=[...set].sort();
+  if (e.planning.some(p=>!p.day)) list.push('');
+  return list;
+}
+function tabDag(){
+  const e=S.event, edit=can('planner'), days=eventDays(), range=localDays(e.start_date,e.end_date);
+  if (!days.length) return `<div class="card empty"><div class="big">📆</div>
+    <p>Er zijn nog geen dagen. ${edit?'Stel eerst de datums van het uitje in via <b>✏️ Bewerken</b>, dan verschijnt hier per dag een planning.':'De planner heeft nog geen datums ingesteld.'}</p></div>`;
+  if (S.day===null || !days.includes(S.day)){
+    const t=todayStr(); S.day = days.includes(t) ? t : days[0];
+  }
+  const k=S.day, info=e.days?.[k]||{}, items=e.planning.filter(p=>(p.day||'')===k);
+  const label = (d,i)=>{ if(!d) return ['Overig','zonder dag'];
+    const n=range.indexOf(d); return [n>=0?`Dag ${n+1}`:'Extra', fmtDay(d)] };
+  const t=todayStr(), nowHM=new Date().toTimeString().slice(0,5);
+  const isNow=p=> k===t && p.time_start && p.time_start<=nowHM && (!p.time_end || nowHM<p.time_end);
+  const time=p=> p.time_start ? esc(p.time_start)+(p.time_end?' – '+esc(p.time_end):'') : '<span class="muted">—</span>';
+  return `
+    <div class="daytabs">${days.map((d,i)=>{ const [a,b]=label(d,i), c=e.planning.filter(p=>(p.day||'')===d).length;
+      return `<button class="${d===k?'on':''}" onclick="S.day='${esc(d)}';renderEvent()">${a}${c?`<span class="cnt">${c}</span>`:''}<small>${esc(b)}${d===t?' · vandaag':''}</small></button>`}).join('')}</div>
+    <div class="card dayhead">
+      <div style="flex:1;min-width:0">
+        <h3>${k?esc(fmtDay(k,true)):'Onderdelen zonder dag'}</h3>
+        ${info.title?`<div class="thema">${esc(info.title)}</div>`:''}
+        ${info.notes?`<div class="notes">${esc(info.notes)}</div>`:''}
+        ${!info.title&&!info.notes&&k&&edit?`<div class="help">Geef deze dag een thema of notities, bijv. "Aankomst & inchecken" of wie er kookt.</div>`:''}
+      </div>
+      ${edit&&k?`<button class="btn sm" onclick="editDay('${esc(k)}')">✏️ Dag bewerken</button>`:''}
+    </div>
+    ${edit?`<div class="row" style="margin-bottom:12px"><span class="spacer"></span><button class="btn primary" onclick="editPlan(null,'${esc(k)}')">＋ Onderdeel voor deze dag</button></div>`:''}
+    ${items.length===0?`<div class="card empty"><div class="big">🕐</div><p>Nog niets gepland voor deze dag.</p></div>`:
+    `<div class="timeline">${items.map(p=>`<div class="pitem ${isNow(p)?'now':''}">
+        <div class="time">${time(p)}${isNow(p)?' <span class="status st-gaande">nu</span>':''}</div>
+        <div class="what"><b>${esc(p.activity)}</b>
+          ${p.who?`<div class="who">👤 ${esc(p.who)}</div>`:''}
+          ${p.notes?`<div class="notes">${esc(p.notes)}</div>`:''}</div>
+        ${edit?`<div class="acts"><button class="icon-btn" title="Bewerken" onclick="editPlan(${p.id})">✏️</button>
+          <button class="icon-btn" title="Verwijderen" onclick="delItem('planning',${p.id})">🗑️</button></div>`:''}
+      </div>`).join('')}</div>`}`;
+}
+function editDay(k){
+  const info=S.event.days?.[k]||{};
+  modal({title:'Dag bewerken – '+fmtDay(k,true), fields:[
+      {name:'title',label:'Thema / titel van de dag',value:info.title,ph:'Bijv. Aankomst & inchecken'},
+      {name:'notes',label:'Notities voor deze dag',type:'textarea',rows:6,value:info.notes,ph:'Bijv. ontbijt: tante Ans · boodschappen: Jan · regen? Dan zwembad'}],
+    onSubmit: async v=>{ await api('PUT',`/api/events/${S.event.id}/days/${k}`,v); toast('Dag opgeslagen'); reload() }});
+}
+async function setStatus(v){
+  try{ await api('PUT','/api/events/'+S.event.id,{status:v}); toast('Status: '+STATUS[v]); reload() }catch(e){ fail(e) }
 }
 
 function tabLocatie(){
@@ -428,6 +532,7 @@ function editEvent(e){
   modal({ title: e?'Uitje bewerken':'Nieuw uitje',
     fields:[
       {name:'title',label:'Naam van het uitje',value:e?.title,required:true,ph:'Bijv. Familieweekend Veluwe'},
+      {name:'status',label:'Status',type:'select',value:e?.status||'concept',options:[['concept','📝 Concept – nog in voorbereiding'],['gepland','📅 Gepland – het gaat door'],['gaande','🟢 Gaande – we zijn nu onderweg']]},
       {name:'emoji',label:'Pictogram',type:'emoji',value:e?.emoji},
       [{name:'start_date',label:'Van',type:'date',value:e?.start_date},{name:'end_date',label:'Tot en met',type:'date',value:e?.end_date}],
       {name:'description',label:'Korte omschrijving',type:'textarea',rows:3,value:e?.description},
@@ -458,11 +563,12 @@ function editDetails(){
       ph:'Kosten & verdeling\nInpaklijst\nWifi-code\nHuisregels…'}],
     onSubmit: async v=>{ await api('PUT','/api/events/'+e.id,v); toast('Opgeslagen'); reload() }});
 }
-function editPlan(id){
+function editPlan(id, presetDay){
   const e=S.event, p=id?e.planning.find(x=>x.id===id):null;
   const days=localDays(e.start_date,e.end_date);
+  if (p?.day && !days.includes(p.day)) days.push(p.day);
   const dayField = days.length
-    ? {name:'day',label:'Dag',type:'select',value:p?.day ?? days[0],options:[...days.map(x=>[x,fmtDay(x,true)]),['','Nog niet bepaald']]}
+    ? {name:'day',label:'Dag',type:'select',value:p?.day ?? presetDay ?? days[0],options:[...days.map(x=>[x,fmtDay(x,true)]),['','Nog niet bepaald']]}
     : {name:'day',label:'Dag',type:'date',value:p?.day};
   modal({title:p?'Onderdeel bewerken':'Onderdeel toevoegen', fields:[
       dayField,

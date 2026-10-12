@@ -9,7 +9,7 @@ import os
 import secrets
 import sqlite3
 import time
-from datetime import timedelta
+from datetime import datetime, timedelta
 from functools import wraps
 
 from flask import Flask, g, jsonify, request, send_from_directory, session
@@ -23,7 +23,8 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 ROLES = ("admin", "planner", "lezer")
 RANK = {"lezer": 1, "planner": 2, "admin": 3}
 
-EVENT_FIELDS = ["title", "start_date", "end_date", "description", "emoji",
+STATUSES = ("concept", "gepland", "gaande")
+EVENT_FIELDS = ["title", "status", "start_date", "end_date", "description", "emoji",
                 "location_name", "address", "location_notes", "details"]
 PLAN_FIELDS = ["day", "time_start", "time_end", "activity", "who", "notes"]
 CONTACT_FIELDS = ["name", "role", "phone", "email", "notes"]
@@ -65,6 +66,7 @@ CREATE TABLE IF NOT EXISTS attempts (
 CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
+    status TEXT DEFAULT 'concept',
     start_date TEXT DEFAULT '',
     end_date TEXT DEFAULT '',
     description TEXT DEFAULT '',
@@ -85,6 +87,13 @@ CREATE TABLE IF NOT EXISTS planning (
     activity TEXT NOT NULL,
     who TEXT DEFAULT '',
     notes TEXT DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS event_days (
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    day TEXT NOT NULL,
+    title TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    PRIMARY KEY (event_id, day)
 );
 CREATE TABLE IF NOT EXISTS contacts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,6 +139,11 @@ def init_db():
     with app.app_context():
         db = get_db()
         db.executescript("PRAGMA journal_mode=WAL;" + SCHEMA)
+        # migratie: status-kolom voor bestaande databases
+        cols = [r["name"] for r in db.execute("PRAGMA table_info(events)")]
+        if "status" not in cols:
+            db.execute("ALTER TABLE events ADD COLUMN status TEXT DEFAULT 'gepland'")
+            db.commit()
         defaults = {"max_attempts": "5", "lockout_minutes": "10", "title": "Familieweekend"}
         for k, v in defaults.items():
             if get_setting(k) is None:
@@ -185,6 +199,12 @@ def require(min_role):
             return f(*args, **kwargs)
         return wrapper
     return deco
+
+
+def valid_status(data):
+    if "status" in data and data["status"] not in STATUSES:
+        return False
+    return True
 
 
 def event_or_404(event_id):
@@ -273,7 +293,7 @@ def logout():
 @require("lezer")
 def list_events():
     rows = get_db().execute(
-        "SELECT e.id, e.title, e.start_date, e.end_date, e.description, e.emoji, e.location_name, "
+        "SELECT e.id, e.title, e.status, e.start_date, e.end_date, e.description, e.emoji, e.location_name, "
         "(SELECT COUNT(*) FROM planning p WHERE p.event_id=e.id) AS items "
         "FROM events e ORDER BY CASE WHEN e.start_date='' THEN 1 ELSE 0 END, e.start_date, e.id"
     ).fetchall()
@@ -286,7 +306,10 @@ def create_event():
     data = pick(body(), EVENT_FIELDS)
     if not data.get("title", "").strip():
         return err("Geef het uitje een naam.")
+    if not valid_status(data):
+        return err("Ongeldige status.")
     data.setdefault("emoji", "🏕️")
+    data.setdefault("status", "concept")
     now = time.time()
     cols = list(data.keys()) + ["created_at", "updated_at"]
     vals = list(data.values()) + [now, now]
@@ -308,7 +331,31 @@ def get_event(event_id):
         "CASE WHEN time_start='' THEN 1 ELSE 0 END, time_start, id", (event_id,))]
     ev["contacts"] = [dict(r) for r in db.execute(
         "SELECT * FROM contacts WHERE event_id=? ORDER BY id", (event_id,))]
+    ev["days"] = {r["day"]: {"title": r["title"], "notes": r["notes"]} for r in db.execute(
+        "SELECT day, title, notes FROM event_days WHERE event_id=?", (event_id,))}
     return jsonify(ev)
+
+
+@app.put("/api/events/<int:event_id>/days/<day>")
+@require("planner")
+def update_day(event_id, day):
+    """Titel/thema en notities van één dag (dagplanning)."""
+    if not event_or_404(event_id):
+        return err("Uitje niet gevonden.", 404)
+    try:
+        datetime.strptime(day, "%Y-%m-%d")
+    except ValueError:
+        return err("Ongeldige datum.")
+    d = body()
+    title = str(d.get("title") or "")[:200]
+    notes = str(d.get("notes") or "")[:10000]
+    db = get_db()
+    db.execute("INSERT INTO event_days(event_id, day, title, notes) VALUES(?,?,?,?) "
+               "ON CONFLICT(event_id, day) DO UPDATE SET title=excluded.title, notes=excluded.notes",
+               (event_id, day, title, notes))
+    _touch(event_id)
+    db.commit()
+    return jsonify(ok=True)
 
 
 @app.put("/api/events/<int:event_id>")
@@ -319,6 +366,8 @@ def update_event(event_id):
     data = pick(body(), EVENT_FIELDS)
     if "title" in data and not data["title"].strip():
         return err("De naam mag niet leeg zijn.")
+    if not valid_status(data):
+        return err("Ongeldige status.")
     if not data:
         return jsonify(ok=True)
     data["updated_at"] = time.time()
