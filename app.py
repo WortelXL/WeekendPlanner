@@ -18,16 +18,24 @@ from werkzeug.security import check_password_hash, generate_password_hash
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, "weekend.db")
-STATIC_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+try:
+    with open(os.path.join(BASE_DIR, "VERSION")) as _f:
+        VERSION = _f.read().strip()
+except OSError:
+    VERSION = "dev"
 
 ROLES = ("admin", "planner", "lezer")
 RANK = {"lezer": 1, "planner": 2, "admin": 3}
 
 STATUSES = ("concept", "gepland", "gaande")
-EVENT_FIELDS = ["title", "status", "start_date", "end_date", "description", "emoji",
+TABS = ("planning", "dag", "locatie", "gegevens", "aanwezig")
+EVENT_FIELDS = ["title", "status", "hidden_tabs", "start_date", "end_date", "description", "emoji",
                 "location_name", "address", "location_notes", "details"]
 PLAN_FIELDS = ["day", "time_start", "time_end", "activity", "who", "notes"]
 CONTACT_FIELDS = ["name", "role", "phone", "email", "notes"]
+ATTENDEE_FIELDS = ["name", "notes"]
 
 
 def _secret_key():
@@ -67,6 +75,7 @@ CREATE TABLE IF NOT EXISTS events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
     status TEXT DEFAULT 'concept',
+    hidden_tabs TEXT DEFAULT '',
     start_date TEXT DEFAULT '',
     end_date TEXT DEFAULT '',
     description TEXT DEFAULT '',
@@ -94,6 +103,12 @@ CREATE TABLE IF NOT EXISTS event_days (
     title TEXT DEFAULT '',
     notes TEXT DEFAULT '',
     PRIMARY KEY (event_id, day)
+);
+CREATE TABLE IF NOT EXISTS attendees (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    notes TEXT DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS contacts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -143,7 +158,9 @@ def init_db():
         cols = [r["name"] for r in db.execute("PRAGMA table_info(events)")]
         if "status" not in cols:
             db.execute("ALTER TABLE events ADD COLUMN status TEXT DEFAULT 'gepland'")
-            db.commit()
+        if "hidden_tabs" not in cols:
+            db.execute("ALTER TABLE events ADD COLUMN hidden_tabs TEXT DEFAULT ''")
+        db.commit()
         defaults = {"max_attempts": "5", "lockout_minutes": "10", "title": "Familieweekend"}
         for k, v in defaults.items():
             if get_setting(k) is None:
@@ -202,9 +219,22 @@ def require(min_role):
 
 
 def valid_status(data):
+    """Controleert status en normaliseert hidden_tabs (komma-lijst van TABS)."""
     if "status" in data and data["status"] not in STATUSES:
         return False
+    if "hidden_tabs" in data:
+        parts = [t.strip() for t in data["hidden_tabs"].split(",") if t.strip()]
+        if any(t not in TABS for t in parts):
+            return False
+        data["hidden_tabs"] = ",".join(t for t in TABS if t in parts)
     return True
+
+
+def hidden_for_reader(ev):
+    """Tabbladen die verborgen zijn voor lezers (planner/admin zien alles)."""
+    if g.get("role") != "lezer":
+        return set()
+    return {t for t in (ev.get("hidden_tabs") or "").split(",") if t}
 
 
 def event_or_404(event_id):
@@ -230,7 +260,7 @@ def index():
 
 @app.get("/health")
 def health():
-    return {"ok": True}
+    return {"ok": True, "version": VERSION}
 
 
 # ---------------------------------------------------------------- login
@@ -239,7 +269,7 @@ def me():
     role = session.get("role")
     if role not in RANK or session.get("ver") != get_setting(f"pinver_{role}", "0"):
         role = None
-    return jsonify(role=role, title=get_setting("title", "Familieweekend"),
+    return jsonify(role=role, title=get_setting("title", "Familieweekend"), version=VERSION,
                    admin_default=(role == "admin" and get_setting("admin_default") == "1"))
 
 
@@ -293,11 +323,23 @@ def logout():
 @require("lezer")
 def list_events():
     rows = get_db().execute(
-        "SELECT e.id, e.title, e.status, e.start_date, e.end_date, e.description, e.emoji, e.location_name, "
-        "(SELECT COUNT(*) FROM planning p WHERE p.event_id=e.id) AS items "
+        "SELECT e.id, e.title, e.status, e.hidden_tabs, e.start_date, e.end_date, e.description, e.emoji, "
+        "e.location_name, (SELECT COUNT(*) FROM planning p WHERE p.event_id=e.id) AS items, "
+        "(SELECT COUNT(*) FROM attendees a WHERE a.event_id=e.id) AS attendees "
         "FROM events e ORDER BY CASE WHEN e.start_date='' THEN 1 ELSE 0 END, e.start_date, e.id"
     ).fetchall()
-    return jsonify([dict(r) for r in rows])
+    out = []
+    for r in rows:
+        ev = dict(r)
+        hidden = hidden_for_reader(ev)
+        if "locatie" in hidden:
+            ev["location_name"] = ""
+        if {"planning", "dag"} <= hidden:
+            ev["items"] = None
+        if "aanwezig" in hidden:
+            ev["attendees"] = None
+        out.append(ev)
+    return jsonify(out)
 
 
 @app.post("/api/events")
@@ -333,6 +375,20 @@ def get_event(event_id):
         "SELECT * FROM contacts WHERE event_id=? ORDER BY id", (event_id,))]
     ev["days"] = {r["day"]: {"title": r["title"], "notes": r["notes"]} for r in db.execute(
         "SELECT day, title, notes FROM event_days WHERE event_id=?", (event_id,))}
+    ev["attendees"] = [dict(r) for r in db.execute(
+        "SELECT * FROM attendees WHERE event_id=? ORDER BY name COLLATE NOCASE, id", (event_id,))]
+    # verborgen tabbladen: gegevens niet meesturen naar lezers
+    hidden = hidden_for_reader(ev)
+    if {"planning", "dag"} <= hidden:
+        ev["planning"] = []
+    if "dag" in hidden:
+        ev["days"] = {}
+    if "locatie" in hidden:
+        ev.update(location_name="", address="", location_notes="")
+    if "gegevens" in hidden:
+        ev.update(contacts=[], details="")
+    if "aanwezig" in hidden:
+        ev["attendees"] = []
     return jsonify(ev)
 
 
@@ -442,6 +498,7 @@ def _child_routes(table, fields, required, required_msg):
 
 _child_routes("planning", PLAN_FIELDS, "activity", "Vul een activiteit in.")
 _child_routes("contacts", CONTACT_FIELDS, "name", "Vul een naam in.")
+_child_routes("attendees", ATTENDEE_FIELDS, "name", "Vul een naam in.")
 
 
 # ---------------------------------------------------------------- admin

@@ -1,5 +1,7 @@
 # 🏕️ Familie Weekendplanner
 
+**Versie 0.0.3** · zie [CHANGELOG.md](CHANGELOG.md)
+
 Een kleine webapp om familie-uitjes te plannen: planning per dag, locatie (met kaart en route) en gegevens (contactpersonen, kosten, inpaklijst, …). Afgeschermd met pincodes per rol.
 
 ## Functies
@@ -8,11 +10,13 @@ Een kleine webapp om familie-uitjes te plannen: planning per dag, locatie (met k
   - 📝 **Concept**: nog in voorbereiding
   - 📅 **Gepland**: het gaat door
   - 🟢 **Gaande**: we zijn nu onderweg (staat bovenaan en opent direct de dagplanning van vandaag)
-- Per uitje vier tabbladen:
+- Per uitje vijf tabbladen:
   - **Planning**: overzicht van alle dagen
   - **Dagplanning**: per dag een eigen sub-tabblad (Dag 1, Dag 2, …) met thema, notities en een tijdlijn; wat nu bezig is wordt gemarkeerd
   - **Locatie**: adres, kaart, route en praktische info
   - **Gegevens**: contactpersonen en overige info
+  - **Aanwezig**: wie er komen, met bijzonderheden per persoon
+- **Zichtbaarheid per uitje**: planner/admin kan elk tabblad aan- of uitzetten voor lezers (👁️ Zichtbaarheid)
 
 ## Starten
 

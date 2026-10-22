@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.0.3] - 2026-10-22
+
+### Toegevoegd
+- **Tabblad Aanwezig** per uitje: wie er komen, met per persoon een veld voor bijzonderheden
+  (dieet, allergie, aankomsttijd, …).
+  - Snel toevoegen via naam + bijzonderheden, of meerdere tegelijk (één per regel, `Naam: bijzonderheden`).
+  - Aantal aanwezigen zichtbaar op het uitje-kaartje in het overzicht.
+- **Zichtbaarheid per tabblad** (knop 👁️ Zichtbaarheid, planner/admin): Planning, Dagplanning, Locatie,
+  Gegevens en Aanwezig per uitje aan/uit zetten voor lezers.
+  - Verborgen tabbladen blijven voor planners en admin zichtbaar, gemarkeerd met 🚫.
+  - Gegevens van verborgen tabbladen worden ook door de server niet naar lezers gestuurd.
+
+### Opgelost
+- Versienummer in de app en op `/health` (onderdeel van 0.0.2, maar `app.py` en `README.md` waren niet meegekomen).
+- Op mobiel schuift het actieve tabblad automatisch in beeld.
+
+### Migratie
+- Bestaande databases worden automatisch bijgewerkt; alle tabbladen staan standaard aan.
+
 ## [0.0.2] - 2026-10-12
 
 ### Toegevoegd
