@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.6] - 2026-11-02
+
+### Gewijzigd
+- **Uitgezette tabbladen zijn nu weg voor planners én lezers.** Alleen de admin ziet een uitgezet tabblad nog
+  (gemarkeerd met 🚫), zodat hij het kan voorbereiden en later aanzetten via 👁️ Zichtbaarheid.
+- De server stuurt de gegevens van uitgezette tabbladen niet meer naar planners en weigert wijzigingen
+  door planners in die tabbladen (bijv. aanwezigen, contactpersonen, bijlagen of regels van een eigen tabblad).
+
 ## [0.0.5] - 2026-11-02
 
 ### Gewijzigd

@@ -434,7 +434,7 @@ async function reload(){ try{ await loadEvent(S.event.id) }catch(e){ fail(e) } }
 function renderEvent(){
   const e = S.event, edit = can('planner');
   const hid = hiddenTabs(e);
-  const tabs = allTabs(e).filter(([k])=> edit || !hid.includes(k));
+  const tabs = allTabs(e).filter(([k])=> can('admin') || !hid.includes(k));
   if (tabs.length && !tabs.some(([k])=>k===S.tab)) S.tab = tabs[0][0];
   $('#main').innerHTML = `
     <div class="row" style="margin-bottom:14px"><button class="btn sm" onclick="go('list')">← Alle uitjes</button>
@@ -454,11 +454,11 @@ function renderEvent(){
     </div>
     <div class="tabs">
       ${tabs.map(([k,l])=>
-        `<button class="${S.tab===k?'on':''} ${hid.includes(k)?'off':''}" onclick="S.tab='${k}';renderEvent()" ${hid.includes(k)?'title="Verborgen voor lezers"':''}>${l}${hid.includes(k)?'<span class="eye">🚫</span>':''}</button>`).join('')}
+        `<button class="${S.tab===k?'on':''} ${hid.includes(k)?'off':''}" onclick="S.tab='${k}';renderEvent()" ${hid.includes(k)?'title="Uit: verborgen voor planners en lezers"':''}>${l}${hid.includes(k)?'<span class="eye">🚫</span>':''}</button>`).join('')}
       ${can('admin')?`<button class="add" onclick="newTab()" title="Eigen tabblad toevoegen">＋ Tab</button>`:''}
     </div>
     ${!tabs.length?`<div class="card empty"><div class="big">🙈</div><p>Er is voor dit uitje (nog) niets te zien.</p></div>`:`
-    ${hid.includes(S.tab)?`<div class="hidden-note">🚫 Dit tabblad is <b>verborgen voor lezers</b>. Alleen planners en de admin zien het.${can('admin')?` Aanzetten via <a href="#" onclick="editVisibility();return false">👁️ Zichtbaarheid</a>.`:''}</div>`:''}
+    ${hid.includes(S.tab)?`<div class="hidden-note">🚫 Dit tabblad staat <b>uit</b>: planners en lezers zien het niet, alleen jij als admin. Aanzetten via <a href="#" onclick="editVisibility();return false">👁️ Zichtbaarheid</a>.</div>`:''}
     <div id="tabBody">${S.tab.startsWith('c')?tabCustom(+S.tab.slice(1)):({planning:tabPlanning,dag:tabDag,locatie:tabLocatie,gegevens:tabGegevens,aanwezig:tabAanwezig,bijlagen:tabBijlagen})[S.tab]()}</div>`}`;
   showActiveTab(); bindDrop();
 }
@@ -467,7 +467,7 @@ function showActiveTab(){ const t=document.querySelector('.tabs'), b=t&&t.queryS
   if (b.offsetLeft+b.offsetWidth > t.scrollLeft+t.clientWidth || b.offsetLeft < t.scrollLeft) t.scrollLeft = b.offsetLeft - 16 }
 function tabPlanning(){
   const e=S.event, edit=can('planner');
-  const dagOk = edit || !hiddenTabs(e).includes('dag');
+  const dagOk = can('admin') || !hiddenTabs(e).includes('dag');
   const groups={};
   e.planning.forEach(p=>{ (groups[p.day||'']=groups[p.day||'']||[]).push(p) });
   const keys=Object.keys(groups).sort((a,b)=> a===''?1:b===''?-1:a.localeCompare(b));
@@ -586,12 +586,12 @@ function bulkAttendees(){
 }
 function editVisibility(){
   const hid=hiddenTabs(S.event);
-  modal({title:'Zichtbaarheid tabbladen', intro:'Vink aan welke tabbladen <b>lezers</b> bij dit uitje mogen zien. Uitgezette tabbladen blijven voor planners en de admin zichtbaar (gemarkeerd met 🚫), zodat je ze rustig kunt voorbereiden.',
-    fields:[{name:'show',type:'checks',label:'Zichtbaar voor lezers',options:allTabs(S.event).map(([k,l,d])=>[k,l,d,!hid.includes(k)])}],
+  modal({title:'Zichtbaarheid tabbladen', intro:'Vink aan welke tabbladen bij dit uitje <b>zichtbaar</b> zijn. Een uitgezet tabblad is weg voor planners en lezers; alleen jij als admin ziet het nog (gemarkeerd met 🚫), zodat je het rustig kunt voorbereiden.',
+    fields:[{name:'show',type:'checks',label:'Zichtbaar voor planners en lezers',options:allTabs(S.event).map(([k,l,d])=>[k,l,d,!hid.includes(k)])}],
     onSubmit: async v=>{
       const hidden=allTabs(S.event).map(([k])=>k).filter(k=>!v.show.includes(k));
       await api('PUT','/api/events/'+S.event.id,{hidden_tabs:hidden.join(',')});
-      toast(hidden.length?`${hidden.length} ${hidden.length===1?'tabblad':'tabbladen'} verborgen voor lezers`:'Alle tabbladen zichtbaar'); reload() }});
+      toast(hidden.length?`${hidden.length} ${hidden.length===1?'tabblad staat':'tabbladen staan'} uit`:'Alle tabbladen zichtbaar'); reload() }});
 }
 
 /* ---------- eigen tabbladen ---------- */

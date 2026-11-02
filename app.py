@@ -270,10 +270,23 @@ def valid_status(data):
 
 
 def hidden_for_reader(ev):
-    """Tabbladen die verborgen zijn voor lezers (planner/admin zien alles)."""
-    if g.get("role") != "lezer":
+    """Tabbladen die verborgen zijn voor de huidige gebruiker (alleen de admin ziet alles)."""
+    if g.get("role") == "admin":
         return set()
     return {t for t in (ev.get("hidden_tabs") or "").split(",") if t}
+
+
+def tab_blocked(event_id, *tabs):
+    """True als (alle) genoemde tabbladen verborgen zijn voor deze gebruiker."""
+    if g.get("role") == "admin":
+        return False
+    row = get_db().execute("SELECT hidden_tabs FROM events WHERE id=?", (event_id,)).fetchone()
+    hidden = {t for t in ((row["hidden_tabs"] if row else "") or "").split(",") if t}
+    return all(t in hidden for t in tabs)
+
+
+def blocked_err():
+    return err("Dit tabblad is verborgen.", 403, "forbidden")
 
 
 def event_or_404(event_id):
@@ -450,6 +463,8 @@ def update_day(event_id, day):
     """Titel/thema en notities van één dag (dagplanning)."""
     if not event_or_404(event_id):
         return err("Uitje niet gevonden.", 404)
+    if tab_blocked(event_id, "dag"):
+        return blocked_err()
     try:
         datetime.strptime(day, "%Y-%m-%d")
     except ValueError:
@@ -474,6 +489,10 @@ def update_event(event_id):
     data = pick(body(), EVENT_FIELDS)
     if "hidden_tabs" in data and g.role != "admin":
         return err("Alleen de admin kan de zichtbaarheid van tabbladen wijzigen.", 403, "forbidden")
+    if any(k in data for k in ("location_name", "address", "location_notes")) and tab_blocked(event_id, "locatie"):
+        return blocked_err()
+    if "details" in data and tab_blocked(event_id, "gegevens"):
+        return blocked_err()
     if "title" in data and not data["title"].strip():
         return err("De naam mag niet leeg zijn.")
     if not valid_status(data):
@@ -502,13 +521,19 @@ def _touch(event_id):
     get_db().execute("UPDATE events SET updated_at=? WHERE id=?", (time.time(), event_id))
 
 
+CHILD_TABS = {"planning": ("planning", "dag"), "contacts": ("gegevens",), "attendees": ("aanwezig",)}
+
+
 def _child_routes(table, fields, required, required_msg):
-    """Maakt CRUD-routes voor planning/contacts."""
+    """Maakt CRUD-routes voor planning/contacts/attendees."""
+    tabs = CHILD_TABS[table]
 
     @require("planner")
     def create(event_id):
         if not event_or_404(event_id):
             return err("Uitje niet gevonden.", 404)
+        if tab_blocked(event_id, *tabs):
+            return blocked_err()
         data = pick(body(), fields)
         if not data.get(required, "").strip():
             return err(required_msg)
@@ -526,6 +551,8 @@ def _child_routes(table, fields, required, required_msg):
         row = db.execute(f"SELECT event_id FROM {table} WHERE id=?", (item_id,)).fetchone()
         if not row:
             return err("Niet gevonden.", 404)
+        if tab_blocked(row["event_id"], *tabs):
+            return blocked_err()
         data = pick(body(), fields)
         if required in data and not data[required].strip():
             return err(required_msg)
@@ -540,6 +567,8 @@ def _child_routes(table, fields, required, required_msg):
     def delete(item_id):
         db = get_db()
         row = db.execute(f"SELECT event_id FROM {table} WHERE id=?", (item_id,)).fetchone()
+        if row and tab_blocked(row["event_id"], *tabs):
+            return blocked_err()
         if row:
             db.execute(f"DELETE FROM {table} WHERE id=?", (item_id,))
             _touch(row["event_id"])
@@ -594,6 +623,8 @@ def update_tab(tab_id):
     # naam, pictogram en soort beheert alleen de admin; de inhoud (tekst) mag de planner bewerken
     if any(k in d for k in ("title", "emoji", "kind")) and g.role != "admin":
         return err("Alleen de admin kan tabbladen beheren.", 403, "forbidden")
+    if tab_blocked(t["event_id"], f"c{tab_id}"):
+        return blocked_err()
     data = {}
     if "title" in d:
         data["title"] = str(d["title"] or "").strip()[:40]
@@ -655,6 +686,8 @@ def create_item(tab_id):
     t = _tab(tab_id)
     if not t:
         return err("Tabblad niet gevonden.", 404)
+    if tab_blocked(t["event_id"], f"c{tab_id}"):
+        return blocked_err()
     d = body()
     title = str(d.get("title") or "").strip()[:500]
     if not title:
@@ -669,7 +702,7 @@ def create_item(tab_id):
 
 def _item_event(item_id):
     return get_db().execute(
-        "SELECT t.event_id FROM custom_items i JOIN custom_tabs t ON t.id=i.tab_id WHERE i.id=?",
+        "SELECT t.event_id, t.id AS tab_id FROM custom_items i JOIN custom_tabs t ON t.id=i.tab_id WHERE i.id=?",
         (item_id,)).fetchone()
 
 
@@ -679,6 +712,8 @@ def update_item(item_id):
     row = _item_event(item_id)
     if not row:
         return err("Niet gevonden.", 404)
+    if tab_blocked(row["event_id"], f"c{row['tab_id']}"):
+        return blocked_err()
     d = body()
     data = {}
     if "title" in d:
@@ -702,6 +737,8 @@ def update_item(item_id):
 @require("planner")
 def delete_item(item_id):
     row = _item_event(item_id)
+    if row and tab_blocked(row["event_id"], f"c{row['tab_id']}"):
+        return blocked_err()
     if row:
         db = get_db()
         db.execute("DELETE FROM custom_items WHERE id=?", (item_id,))
@@ -727,6 +764,8 @@ def _clean_name(name):
 def upload_attachments(event_id):
     if not event_or_404(event_id):
         return err("Uitje niet gevonden.", 404)
+    if tab_blocked(event_id, "bijlagen"):
+        return blocked_err()
     files = [f for f in request.files.getlist("files") if f and f.filename]
     if not files:
         return err("Kies minimaal één bestand.")
@@ -782,6 +821,8 @@ def update_attachment(att_id):
     a = _attachment(att_id)
     if not a:
         return err("Bijlage niet gevonden.", 404)
+    if tab_blocked(a["event_id"], "bijlagen"):
+        return blocked_err()
     d = body()
     data = {}
     if "description" in d:
@@ -800,6 +841,8 @@ def update_attachment(att_id):
 @require("planner")
 def delete_attachment(att_id):
     a = _attachment(att_id)
+    if a and tab_blocked(a["event_id"], "bijlagen"):
+        return blocked_err()
     if a:
         db = get_db()
         db.execute("DELETE FROM attachments WHERE id=?", (att_id,))
