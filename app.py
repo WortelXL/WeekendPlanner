@@ -15,6 +15,7 @@ import sqlite3
 import time
 from datetime import datetime, timedelta
 from functools import wraps
+from urllib.parse import urlparse
 
 from flask import Flask, g, jsonify, request, send_file, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -147,6 +148,14 @@ CREATE TABLE IF NOT EXISTS attachments (
     size INTEGER DEFAULT 0,
     description TEXT DEFAULT '',
     uploaded_at REAL
+);
+CREATE TABLE IF NOT EXISTS links (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    url TEXT NOT NULL,
+    description TEXT DEFAULT '',
+    created_at REAL
 );
 CREATE TABLE IF NOT EXISTS contacts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -439,11 +448,14 @@ def get_event(event_id):
     ev["attachments"] = [dict(r) for r in db.execute(
         "SELECT id, filename, mime, size, description, uploaded_at FROM attachments "
         "WHERE event_id=? ORDER BY uploaded_at DESC, id DESC", (event_id,))]
+    ev["links"] = [dict(r) for r in db.execute(
+        "SELECT * FROM links WHERE event_id=? ORDER BY title COLLATE NOCASE, id", (event_id,))]
     # verborgen tabbladen: gegevens niet meesturen naar lezers
     hidden = hidden_for_reader(ev)
     ev["custom_tabs"] = [t for t in tabs if f"c{t['id']}" not in hidden]
     if "bijlagen" in hidden:
         ev["attachments"] = []
+        ev["links"] = []
     if {"planning", "dag"} <= hidden:
         ev["planning"] = []
     if "dag" in hidden:
@@ -852,6 +864,102 @@ def delete_attachment(att_id):
             os.remove(os.path.join(UPLOAD_DIR, str(a["event_id"]), a["stored"]))
         except OSError:
             pass
+    return jsonify(ok=True)
+
+
+# ---------------------------------------------------------------- links (in tabblad Bijlagen)
+def clean_url(raw):
+    """Geeft een veilige http(s)-URL terug, of None. 'www.x.nl' wordt 'https://www.x.nl'."""
+    url = str(raw or "").strip()
+    if not url or len(url) > 2000 or any(ch.isspace() for ch in url):
+        return None
+    if "://" not in url:
+        url = "https://" + url
+    try:
+        u = urlparse(url)
+        host = u.hostname or ""
+    except ValueError:
+        return None
+    if u.scheme.lower() not in ("http", "https") or not host:
+        return None
+    if "." not in host and host != "localhost":
+        return None
+    return url
+
+
+def _link_data(d, partial=False):
+    data = {}
+    if "url" in d or not partial:
+        url = clean_url(d.get("url"))
+        if not url:
+            return None, "Vul een geldige link in, bijv. https://www.voorbeeld.nl"
+        data["url"] = url
+    if "title" in d or not partial:
+        title = str(d.get("title") or "").strip()[:150]
+        if not title and "url" in data:
+            title = urlparse(data["url"]).hostname.removeprefix("www.")
+        if not title:
+            return None, "Geef de link een naam."
+        data["title"] = title
+    if "description" in d:
+        data["description"] = str(d["description"] or "")[:1000]
+    return data, None
+
+
+@app.post("/api/events/<int:event_id>/links")
+@require("planner")
+def create_link(event_id):
+    if not event_or_404(event_id):
+        return err("Uitje niet gevonden.", 404)
+    if tab_blocked(event_id, "bijlagen"):
+        return blocked_err()
+    data, msg = _link_data(body())
+    if msg:
+        return err(msg)
+    db = get_db()
+    cur = db.execute("INSERT INTO links(event_id, title, url, description, created_at) VALUES(?,?,?,?,?)",
+                     (event_id, data["title"], data["url"], data.get("description", ""), time.time()))
+    _touch(event_id)
+    db.commit()
+    return jsonify(id=cur.lastrowid), 201
+
+
+def _link(link_id):
+    row = get_db().execute("SELECT * FROM links WHERE id=?", (link_id,)).fetchone()
+    return dict(row) if row else None
+
+
+@app.put("/api/links/<int:link_id>")
+@require("planner")
+def update_link(link_id):
+    l = _link(link_id)
+    if not l:
+        return err("Link niet gevonden.", 404)
+    if tab_blocked(l["event_id"], "bijlagen"):
+        return blocked_err()
+    data, msg = _link_data(body(), partial=True)
+    if msg:
+        return err(msg)
+    if data:
+        db = get_db()
+        db.execute(f"UPDATE links SET {', '.join(f'{k}=?' for k in data)} WHERE id=?",
+                   list(data.values()) + [link_id])
+        _touch(l["event_id"])
+        db.commit()
+    return jsonify(ok=True)
+
+
+@app.delete("/api/links/<int:link_id>")
+@require("planner")
+def delete_link(link_id):
+    l = _link(link_id)
+    if l and tab_blocked(l["event_id"], "bijlagen"):
+        return blocked_err()
+    if l:
+        db = get_db()
+        db.execute("DELETE FROM links WHERE id=?", (link_id,))
+        _touch(l["event_id"])
+        db.commit()
     return jsonify(ok=True)
 
 

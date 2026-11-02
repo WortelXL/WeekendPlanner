@@ -235,6 +235,23 @@ select.status-sel{border:1px solid var(--line);border-radius:99px;padding:3px 8p
 .file .fd{font-size:13px;white-space:pre-wrap}
 .file .fa{display:flex;gap:2px;padding:0 6px 6px}
 
+/* links */
+a.lnk{color:var(--brand);text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+.linklist{display:grid;gap:8px;margin-bottom:18px}
+.linkrow{display:flex;align-items:center;gap:12px;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+.linkrow .ic{width:38px;height:38px;border-radius:10px;background:var(--brand-soft);display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;text-decoration:none}
+.linkrow .body{flex:1;min-width:0}
+.linkrow .lt{font-weight:600;color:var(--brand);text-decoration:none;overflow-wrap:anywhere}
+.linkrow .lt:hover{text-decoration:underline}
+.linkrow .lh{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.linkrow .ld{font-size:13px;white-space:pre-wrap}
+.uprow{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px}
+.uprow .drop{flex:2 1 260px;margin:0}
+.uprow .addlink{flex:1 1 200px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;border:2px dashed var(--line);border-radius:var(--radius);background:var(--card);cursor:pointer;padding:16px;font:inherit;color:inherit}
+.uprow .addlink:hover{border-color:var(--brand);background:var(--brand-soft)}
+.uprow .addlink .big{font-size:30px}
+.field-help{font-size:12px;color:var(--muted);margin-top:4px}
+
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);
   padding:10px 16px;border-radius:10px;z-index:60;font-size:15px;opacity:0;transition:.2s;pointer-events:none}
 #toast.show{opacity:1}
@@ -279,7 +296,7 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const TABS = [['planning','🗓️ Planning','Overzicht van alle dagen'],['dag','📆 Dagplanning','Per dag een eigen planning'],
   ['locatie','📍 Locatie','Adres, kaart en praktische info'],['gegevens','📋 Gegevens','Contactpersonen en overige info'],
-  ['aanwezig','👥 Aanwezig','Wie er komen, met bijzonderheden'],['bijlagen','📎 Bijlagen','Foto\'s, PDF\'s en andere bestanden']];
+  ['aanwezig','👥 Aanwezig','Wie er komen, met bijzonderheden'],['bijlagen','📎 Bijlagen','Foto\'s, PDF\'s, bestanden en links']];
 const KINDS = {tekst:['📝 Tekst','Een vrij tekstveld, bijv. huisregels of een verhaal'],
   lijst:['📋 Lijst','Regels met omschrijving en bijzonderheden, bijv. menu of activiteiten'],
   checklist:['✅ Afvinklijst','Regels om af te vinken, bijv. inpaklijst of boodschappen']};
@@ -290,6 +307,18 @@ const STATUS = {gaande:'Gaande', gepland:'Gepland', concept:'Concept'};
 const STATUS_ORDER = {gaande:0, gepland:1, concept:2};
 const statusBadge = st => `<span class="status st-${esc(st||'concept')}">${esc(STATUS[st]||'Concept')}</span>`;
 const todayStr = () => { const x=new Date(); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}` };
+/* Maakt webadressen in tekst klikbaar. Ondersteunt ook [linktekst](https://...). Alleen http(s). */
+function linkify(text){
+  let h = esc(text); const keep=[];
+  const a = (url,label)=>{ const href = /^https?:\/\//i.test(url) ? url : 'https://'+url;
+    keep.push(`<a href="${href}" target="_blank" rel="noopener noreferrer" class="lnk">${label}</a>`); return `\u0000${keep.length-1}\u0000` };
+  h = h.replace(/\[([^\]\n]{1,200})\]\(((?:https?:\/\/|www\.)[^\s()<]+)\)/gi, (m,label,url)=>a(url,label));
+  h = h.replace(/(^|[\s(>])((?:https?:\/\/|www\.)[^\s<\u0000]+)/gi, (m,pre,url)=>{
+    const t = url.match(/[.,;:!?)]+$/); const tail = t ? t[0] : ''; if (tail) url = url.slice(0,-tail.length);
+    let label = url.replace(/^https?:\/\//i,''); if (label.length>50) label = label.slice(0,47)+'…';
+    return pre + a(url,label) + tail });
+  return h.replace(/\u0000(\d+)\u0000/g, (m,i)=>keep[+i]);
+}
 const EMOJIS = ['🏕️','🏖️','🏔️','🌲','🚲','⛵','🏰','🎡','🎉','🍽️','🏡','🚗','⛷️','🦆','☀️','❤️'];
 
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200)}
@@ -449,7 +478,7 @@ function renderEvent(){
           ${edit?`<select class="status-sel st-${esc(e.status)}" onchange="setStatus(this.value)" title="Status van het uitje">
             ${Object.entries(STATUS).map(([k,l])=>`<option value="${k}" ${e.status===k?'selected':''}>${l}</option>`).join('')}</select>`:statusBadge(e.status)}</div>
         <div class="muted">📅 ${esc(fmtRange(e.start_date,e.end_date))}${e.location_name?` · 📍 ${esc(e.location_name)}`:''}</div>
-        ${e.description?`<div class="desc">${esc(e.description)}</div>`:''}
+        ${e.description?`<div class="desc">${linkify(e.description)}</div>`:''}
       </div>
     </div>
     <div class="tabs">
@@ -480,7 +509,7 @@ function tabPlanning(){
         <div class="time">${time(p)}</div>
         <div class="what"><b>${esc(p.activity)}</b>
           ${p.who?`<div class="who">👤 ${esc(p.who)}</div>`:''}
-          ${p.notes?`<div class="notes">${esc(p.notes)}</div>`:''}</div>
+          ${p.notes?`<div class="notes">${linkify(p.notes)}</div>`:''}</div>
         ${edit?`<div class="acts"><button class="icon-btn" title="Bewerken" onclick="editPlan(${p.id})">✏️</button>
           <button class="icon-btn" title="Verwijderen" onclick="delItem('planning',${p.id})">🗑️</button></div>`:''}
       </div>`).join('')}</div>`).join('')}`;
@@ -514,7 +543,7 @@ function tabDag(){
       <div style="flex:1;min-width:0">
         <h3>${k?esc(fmtDay(k,true)):'Onderdelen zonder dag'}</h3>
         ${info.title?`<div class="thema">${esc(info.title)}</div>`:''}
-        ${info.notes?`<div class="notes">${esc(info.notes)}</div>`:''}
+        ${info.notes?`<div class="notes">${linkify(info.notes)}</div>`:''}
         ${!info.title&&!info.notes&&k&&edit?`<div class="help">Geef deze dag een thema of notities, bijv. "Aankomst & inchecken" of wie er kookt.</div>`:''}
       </div>
       ${edit&&k?`<button class="btn sm" onclick="editDay('${esc(k)}')">✏️ Dag bewerken</button>`:''}
@@ -525,7 +554,7 @@ function tabDag(){
         <div class="time">${time(p)}${isNow(p)?' <span class="status st-gaande">nu</span>':''}</div>
         <div class="what"><b>${esc(p.activity)}</b>
           ${p.who?`<div class="who">👤 ${esc(p.who)}</div>`:''}
-          ${p.notes?`<div class="notes">${esc(p.notes)}</div>`:''}</div>
+          ${p.notes?`<div class="notes">${linkify(p.notes)}</div>`:''}</div>
         ${edit?`<div class="acts"><button class="icon-btn" title="Bewerken" onclick="editPlan(${p.id})">✏️</button>
           <button class="icon-btn" title="Verwijderen" onclick="delItem('planning',${p.id})">🗑️</button></div>`:''}
       </div>`).join('')}</div>`}`;
@@ -554,7 +583,7 @@ function tabAanwezig(){
     ${list.length===0?`<div class="card empty"><div class="big">👥</div><p>Nog niemand toegevoegd.</p></div>`:
     `<div class="card" style="padding:4px 0">${list.map(a=>`<div class="att">
         <div class="av">${ini(a.name)}</div>
-        <div class="body"><div class="nm">${esc(a.name)}</div><div class="bz">${esc(a.notes)}</div></div>
+        <div class="body"><div class="nm">${esc(a.name)}</div><div class="bz">${linkify(a.notes)}</div></div>
         ${edit?`<div class="acts"><button class="icon-btn" title="Bewerken" onclick="editAttendee(${a.id})">✏️</button><button class="icon-btn" title="Verwijderen" onclick="delItem('attendees',${a.id})">🗑️</button></div>`:''}
       </div>`).join('')}</div>`}`;
 }
@@ -630,7 +659,7 @@ function tabCustom(id){
       <button class="btn sm danger" onclick="deleteTab(${id})">🗑️</button></div>`:'';
   if (t.kind==='tekst') return tools+`
     ${edit?`<div class="row" style="margin-bottom:10px"><span class="spacer"></span><button class="btn sm primary" onclick="editTabText(${id})">✏️ Tekst bewerken</button></div>`:''}
-    <div class="card pre">${t.content?esc(t.content):'<span class="muted">Nog geen tekst.</span>'}</div>`;
+    <div class="card pre">${t.content?linkify(t.content):'<span class="muted">Nog geen tekst.</span>'}</div>`;
   const items=t.items||[], done=items.filter(i=>i.done).length, check=t.kind==='checklist';
   return tools+`
     ${check&&items.length?`<div class="row"><b>${done} van ${items.length} afgevinkt</b></div><div class="progress"><span style="width:${Math.round(done/items.length*100)}%"></span></div>`:''}
@@ -641,7 +670,7 @@ function tabCustom(id){
     ${!items.length?`<div class="card empty"><div class="big">${esc(t.emoji||'📌')}</div><p>Nog niets toegevoegd.</p></div>`:
     `<div class="card" style="padding:4px 0">${items.map(i=>`<div class="citem ${check&&i.done?'done':''}">
         ${check?`<input type="checkbox" ${i.done?'checked':''} ${edit?`onchange="toggleItem(${i.id},this.checked)"`:'disabled'} aria-label="Afvinken">`:''}
-        <div class="body"><div class="t">${esc(i.title)}</div>${i.notes?`<div class="n">${esc(i.notes)}</div>`:''}</div>
+        <div class="body"><div class="t">${linkify(i.title)}</div>${i.notes?`<div class="n">${linkify(i.notes)}</div>`:''}</div>
         ${edit?`<div class="acts" style="display:flex"><button class="icon-btn" title="Bewerken" onclick="editItem(${id},${i.id})">✏️</button><button class="icon-btn" title="Verwijderen" onclick="delCustomItem(${i.id})">🗑️</button></div>`:''}
       </div>`).join('')}</div>`}`;
 }
@@ -678,13 +707,22 @@ function fileIcon(m,n){ m=m||''; n=(n||'').toLowerCase();
   if(/\.(zip|rar|7z|gz)$/.test(n)) return '🗜️'; return '📎' }
 const THUMB_TYPES=['image/jpeg','image/png','image/gif','image/webp'];
 function tabBijlagen(){
-  const e=S.event, edit=can('planner'), list=e.attachments||[];
+  const e=S.event, edit=can('planner'), list=e.attachments||[], links=e.links||[];
   return `
-    ${edit?`<div class="drop" id="drop" onclick="document.getElementById('fileIn').click()">
+    ${edit?`<div class="uprow"><div class="drop" id="drop" onclick="document.getElementById('fileIn').click()">
       <div class="big">📤</div><b>Bestanden toevoegen</b>
       <div class="help">Klik of sleep bestanden hierheen. Foto's, PDF's, documenten… (max. ${S.maxUpload||25} MB per keer)</div>
       <input type="file" id="fileIn" multiple onchange="uploadFiles(this.files)">
-      <div class="upbar hidden" id="upbar"><span></span></div></div>`:''}
+      <div class="upbar hidden" id="upbar"><span></span></div></div>
+      <button type="button" class="addlink" onclick="editLink()"><span class="big">🔗</span><b>Link toevoegen</b><span class="help">Website, route, boeking…</span></button></div>`:''}
+    ${links.length?`<div class="section-title" style="margin-top:0"><h3>🔗 ${links.length} ${links.length===1?'link':'links'}</h3></div>
+    <div class="linklist">${links.map(l=>{ let host=''; try{ host=new URL(l.url).hostname.replace(/^www\./,'') }catch(e){}
+      return `<div class="linkrow">
+        <a class="ic" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">🔗</a>
+        <div class="body"><a class="lt" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer">${esc(l.title)}</a>
+          <div class="lh">${esc(host)}</div>${l.description?`<div class="ld">${linkify(l.description)}</div>`:''}</div>
+        ${edit?`<div style="display:flex;flex:0 0 auto"><button class="icon-btn" title="Bewerken" onclick="editLink(${l.id})">✏️</button><button class="icon-btn" title="Verwijderen" onclick="delLink(${l.id})">🗑️</button></div>`:''}
+      </div>`}).join('')}</div>`:''}
     <div class="section-title" style="margin-top:0"><h3>📎 ${list.length} ${list.length===1?'bijlage':'bijlagen'}</h3></div>
     ${!list.length?`<div class="card empty"><div class="big">📎</div><p>Nog geen bijlagen.</p></div>`:
     `<div class="files">${list.map(a=>{ const url='/api/attachments/'+a.id;
@@ -692,7 +730,7 @@ function tabBijlagen(){
         <a class="thumb" href="${url}" target="_blank" rel="noopener">${THUMB_TYPES.includes(a.mime)?`<img src="${url}" loading="lazy" alt="">`:fileIcon(a.mime,a.filename)}</a>
         <div class="info"><div class="fn">${esc(a.filename)}</div>
           <div class="fm">${fmtSize(a.size)} · ${new Date(a.uploaded_at*1000).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}</div>
-          ${a.description?`<div class="fd">${esc(a.description)}</div>`:''}</div>
+          ${a.description?`<div class="fd">${linkify(a.description)}</div>`:''}</div>
         <div class="fa"><a class="icon-btn" href="${url}?download=1" title="Downloaden">⬇️</a>
           ${edit?`<button class="icon-btn" title="Bewerken" onclick="editAttachment(${a.id})">✏️</button><button class="icon-btn" title="Verwijderen" onclick="delAttachment(${a.id})">🗑️</button>`:''}</div>
       </div>`}).join('')}</div>`}`;
@@ -718,6 +756,23 @@ function uploadFiles(files){
   xhr.onerror=()=>{ bar.classList.add('hidden'); toast('Uploaden mislukt') };
   xhr.send(fd);
 }
+function editLink(id){
+  const l=id?S.event.links.find(x=>x.id===id):null;
+  modal({title:l?'Link bewerken':'Link toevoegen', fields:[
+      {name:'url',label:'Webadres (URL)',type:'text',value:l?.url,required:true,ph:'https://www.voorbeeld.nl'},
+      {name:'title',label:'Naam van de link',value:l?.title,ph:'Bijv. Website vakantiepark (leeg = webadres)'},
+      {name:'description',label:'Omschrijving (optioneel)',type:'textarea',rows:2,value:l?.description,ph:'Bijv. Hier staat de incheckinformatie'}],
+    submit:l?'Opslaan':'Toevoegen',
+    onSubmit: async v=>{
+      if (v.url && !/^[a-z]+:\/\//i.test(v.url)) v.url='https://'+v.url;
+      if (l) await api('PUT','/api/links/'+id,v); else await api('POST',`/api/events/${S.event.id}/links`,v);
+      toast('Link opgeslagen'); reload() }});
+}
+async function delLink(id){
+  const l=S.event.links.find(x=>x.id===id);
+  if(!confirm(`Link "${l.title}" verwijderen?`)) return;
+  try{ await api('DELETE','/api/links/'+id); toast('Link verwijderd'); reload() }catch(e){ fail(e) }
+}
 function editAttachment(id){
   const a=S.event.attachments.find(x=>x.id===id);
   modal({title:'Bijlage bewerken', fields:[
@@ -742,7 +797,7 @@ function tabLocatie(){
       <a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}">🗺️ Open in Google Maps</a>
       <a class="btn sm" target="_blank" rel="noopener" href="https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(q)}">🚗 Route plannen</a></div>
       <iframe class="map" loading="lazy" referrerpolicy="no-referrer" src="https://maps.google.com/maps?q=${encodeURIComponent(q)}&z=14&output=embed"></iframe>`:''}
-    ${e.location_notes?`<div class="section-title"><h3>Praktische info</h3></div><div class="pre">${esc(e.location_notes)}</div>`:''}
+    ${e.location_notes?`<div class="section-title"><h3>Praktische info</h3></div><div class="pre">${linkify(e.location_notes)}</div>`:''}
   </div>`;
 }
 
@@ -757,12 +812,12 @@ function tabGegevens(){
       <td><b>${esc(c.name)}</b></td><td>${esc(c.role)}</td>
       <td>${c.phone?`<a href="tel:${esc(c.phone.replace(/[^+\d]/g,''))}">${esc(c.phone)}</a>`:''}</td>
       <td>${c.email?`<a href="mailto:${esc(c.email)}">${esc(c.email)}</a>`:''}</td>
-      <td class="pre">${esc(c.notes)}</td>
+      <td class="pre">${linkify(c.notes)}</td>
       ${edit?`<td style="white-space:nowrap"><button class="icon-btn" onclick="editContact(${c.id})">✏️</button><button class="icon-btn" onclick="delItem('contacts',${c.id})">🗑️</button></td>`:''}
     </tr>`).join('')}</tbody></table></div>`}
     <div class="section-title"><h3>📋 Overige gegevens</h3>
       ${edit?`<button class="btn sm" onclick="editDetails()">✏️ Bewerken</button>`:''}</div>
-    <div class="card pre">${e.details?esc(e.details):'<span class="muted">Bijvoorbeeld: kosten en verdeling, inpaklijst, wifi-code, sleutelafspraken, huisregels…</span>'}</div>`;
+    <div class="card pre">${e.details?linkify(e.details):'<span class="muted">Bijvoorbeeld: kosten en verdeling, inpaklijst, wifi-code, sleutelafspraken, huisregels…</span>'}</div>`;
 }
 
 /* ---------- modal ---------- */
@@ -776,7 +831,8 @@ function modal({title, fields, submit, onSubmit, intro}){
       `<label><input type="radio" name="${fld.name}" value="${k}" ${k===(fld.value||'tekst')?'checked':''}><span>${esc(l)}<small>${esc(d)}</small></span></label>`).join('')}</div>`;
     if (fld.type==='checks') return `<label class="lbl">${fld.label}</label><div class="checks">${fld.options.map(([k,l,d,on])=>
       `<label><input type="checkbox" data-checks="${fld.name}" value="${esc(k)}" ${on?'checked':''}><span>${esc(l)}<small>${esc(d||'')}</small></span></label>`).join('')}</div>`;
-    if (fld.type==='textarea') return `<label class="lbl">${fld.label}</label><textarea class="field" name="${fld.name}" rows="${fld.rows||4}" placeholder="${esc(fld.ph||'')}">${v}</textarea>`;
+    if (fld.type==='textarea') return `<label class="lbl">${fld.label}</label><textarea class="field" name="${fld.name}" rows="${fld.rows||4}" placeholder="${esc(fld.ph||'')}">${v}</textarea>
+      <div class="field-help">🔗 Webadressen worden vanzelf klikbaar. Eigen linktekst: <code>[Boekingssite](https://…)</code></div>`;
     if (fld.type==='select') return `<label class="lbl">${fld.label}</label><select class="field" name="${fld.name}">${fld.options.map(([ov,ol])=>`<option value="${esc(ov)}" ${ov===fld.value?'selected':''}>${esc(ol)}</option>`).join('')}</select>`;
     return `<label class="lbl">${fld.label}</label><input class="field" name="${fld.name}" type="${fld.type||'text'}" value="${v}" placeholder="${esc(fld.ph||'')}" ${fld.required?'required':''}>`;
   };

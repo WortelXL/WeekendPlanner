@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.0.7] - 2026-11-02
+
+### Toegevoegd
+- **Links in het tabblad Bijlagen** (knop **🔗 Link toevoegen**, planner/admin): webadres met een eigen naam en
+  optionele omschrijving, bijv. "Website vakantiepark" of "Boottijden". `www.voorbeeld.nl` wordt automatisch
+  `https://www.voorbeeld.nl`. Links openen in een nieuw tabblad.
+- **Webadressen in tekst worden vanzelf klikbaar**: in omschrijvingen, notities, bijzonderheden, praktische info,
+  gegevens, eigen tabbladen en bij bijlagen.
+  - Eigen linktekst (hyperlink) met `[Boekingssite](https://www.voorbeeld.nl)`.
+
+### Beveiliging
+- Alleen `http`- en `https`-links zijn toegestaan (geen `javascript:` e.d.); ook de server controleert dit.
+- Links vallen onder de zichtbaarheid van het tabblad Bijlagen.
+
 ## [0.0.6] - 2026-11-02
 
 ### Gewijzigd
