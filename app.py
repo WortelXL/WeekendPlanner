@@ -472,6 +472,8 @@ def update_event(event_id):
     if not event_or_404(event_id):
         return err("Uitje niet gevonden.", 404)
     data = pick(body(), EVENT_FIELDS)
+    if "hidden_tabs" in data and g.role != "admin":
+        return err("Alleen de admin kan de zichtbaarheid van tabbladen wijzigen.", 403, "forbidden")
     if "title" in data and not data["title"].strip():
         return err("De naam mag niet leeg zijn.")
     if not valid_status(data):
@@ -561,7 +563,7 @@ def _tab(tab_id):
 
 
 @app.post("/api/events/<int:event_id>/tabs")
-@require("planner")
+@require("admin")
 def create_tab(event_id):
     if not event_or_404(event_id):
         return err("Uitje niet gevonden.", 404)
@@ -589,6 +591,9 @@ def update_tab(tab_id):
     if not t:
         return err("Tabblad niet gevonden.", 404)
     d = body()
+    # naam, pictogram en soort beheert alleen de admin; de inhoud (tekst) mag de planner bewerken
+    if any(k in d for k in ("title", "emoji", "kind")) and g.role != "admin":
+        return err("Alleen de admin kan tabbladen beheren.", 403, "forbidden")
     data = {}
     if "title" in d:
         data["title"] = str(d["title"] or "").strip()[:40]
@@ -612,7 +617,7 @@ def update_tab(tab_id):
 
 
 @app.post("/api/tabs/<int:tab_id>/move")
-@require("planner")
+@require("admin")
 def move_tab(tab_id):
     """Verplaats een eigen tabblad naar links (-1) of rechts (+1)."""
     t = _tab(tab_id)
@@ -633,7 +638,7 @@ def move_tab(tab_id):
 
 
 @app.delete("/api/tabs/<int:tab_id>")
-@require("planner")
+@require("admin")
 def delete_tab(tab_id):
     t = _tab(tab_id)
     if t:

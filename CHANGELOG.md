@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.0.5] - 2026-11-02
+
+### Gewijzigd
+- **Eigen tabbladen beheren is alleen voor de admin**: de knop **＋ Tab** en het hernoemen, van soort wisselen,
+  verplaatsen en verwijderen van eigen tabbladen zijn alleen zichtbaar en toegestaan voor de admin.
+  Planners kunnen de inhoud (tekst en regels) wel blijven bewerken en afvinken.
+- **👁️ Zichtbaarheid is alleen voor de admin**: alleen de admin kan tabbladen voor lezers aan- of uitzetten.
+  Planners zien verborgen tabbladen nog wel (gemarkeerd met 🚫).
+- Ook de server weigert deze acties voor planners (niet alleen verborgen in de pagina).
+
 ## [0.0.4] - 2026-11-02
 
 ### Toegevoegd

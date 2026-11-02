@@ -439,8 +439,8 @@ function renderEvent(){
   $('#main').innerHTML = `
     <div class="row" style="margin-bottom:14px"><button class="btn sm" onclick="go('list')">← Alle uitjes</button>
       <span class="spacer"></span>
-      ${edit?`<button class="btn sm" onclick="editEvent(S.event)">✏️ Bewerken</button>
-        <button class="btn sm" onclick="editVisibility()">👁️ Zichtbaarheid</button>`:''}
+      ${edit?`<button class="btn sm" onclick="editEvent(S.event)">✏️ Bewerken</button>`:''}
+      ${can('admin')?`<button class="btn sm" onclick="editVisibility()">👁️ Zichtbaarheid</button>`:''}
       ${can('admin')?`<button class="btn sm danger" onclick="deleteEvent()">🗑️ Verwijderen</button>`:''}</div>
     <div class="card hero">
       <div class="emo">${esc(e.emoji||'🏕️')}</div>
@@ -455,10 +455,10 @@ function renderEvent(){
     <div class="tabs">
       ${tabs.map(([k,l])=>
         `<button class="${S.tab===k?'on':''} ${hid.includes(k)?'off':''}" onclick="S.tab='${k}';renderEvent()" ${hid.includes(k)?'title="Verborgen voor lezers"':''}>${l}${hid.includes(k)?'<span class="eye">🚫</span>':''}</button>`).join('')}
-      ${edit?`<button class="add" onclick="newTab()" title="Eigen tabblad toevoegen">＋ Tab</button>`:''}
+      ${can('admin')?`<button class="add" onclick="newTab()" title="Eigen tabblad toevoegen">＋ Tab</button>`:''}
     </div>
     ${!tabs.length?`<div class="card empty"><div class="big">🙈</div><p>Er is voor dit uitje (nog) niets te zien.</p></div>`:`
-    ${hid.includes(S.tab)?`<div class="hidden-note">🚫 Dit tabblad is <b>verborgen voor lezers</b>. Alleen planners en de admin zien het. Aanzetten via <a href="#" onclick="editVisibility();return false">👁️ Zichtbaarheid</a>.</div>`:''}
+    ${hid.includes(S.tab)?`<div class="hidden-note">🚫 Dit tabblad is <b>verborgen voor lezers</b>. Alleen planners en de admin zien het.${can('admin')?` Aanzetten via <a href="#" onclick="editVisibility();return false">👁️ Zichtbaarheid</a>.`:''}</div>`:''}
     <div id="tabBody">${S.tab.startsWith('c')?tabCustom(+S.tab.slice(1)):({planning:tabPlanning,dag:tabDag,locatie:tabLocatie,gegevens:tabGegevens,aanwezig:tabAanwezig,bijlagen:tabBijlagen})[S.tab]()}</div>`}`;
   showActiveTab(); bindDrop();
 }
@@ -623,7 +623,7 @@ function tabCustom(id){
   const e=S.event, edit=can('planner'), t=(e.custom_tabs||[]).find(x=>x.id===id);
   if(!t) return `<div class="card empty"><p>Tabblad niet gevonden.</p></div>`;
   const ct=e.custom_tabs, idx=ct.indexOf(t);
-  const tools = edit?`<div class="tabtools"><span class="kind">${esc(KINDS[t.kind]?.[0]||'')}</span>
+  const tools = can('admin')?`<div class="tabtools"><span class="kind">${esc(KINDS[t.kind]?.[0]||'')}</span>
       ${idx>0?`<button class="btn sm" title="Naar links" onclick="moveTab(${id},-1)">←</button>`:''}
       ${idx<ct.length-1?`<button class="btn sm" title="Naar rechts" onclick="moveTab(${id},1)">→</button>`:''}
       <button class="btn sm" onclick="editTab(${id})">✏️ Tabblad</button>

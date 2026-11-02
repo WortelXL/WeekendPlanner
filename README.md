@@ -1,6 +1,6 @@
 # 🏕️ Familie Weekendplanner
 
-**Versie 0.0.4** · zie [CHANGELOG.md](CHANGELOG.md)
+**Versie 0.0.5** · zie [CHANGELOG.md](CHANGELOG.md)
 
 Een kleine webapp om familie-uitjes te plannen: planning per dag, locatie (met kaart en route) en gegevens (contactpersonen, kosten, inpaklijst, …). Afgeschermd met pincodes per rol.
 
@@ -17,8 +17,8 @@ Een kleine webapp om familie-uitjes te plannen: planning per dag, locatie (met k
   - **Gegevens**: contactpersonen en overige info
   - **Aanwezig**: wie er komen, met bijzonderheden per persoon
   - **Bijlagen**: foto's, PDF's en andere bestanden uploaden en bekijken
-- **Eigen tabbladen** (＋ Tab): Tekst, Lijst of Afvinklijst, bijv. inpaklijst, menu of huisregels
-- **Zichtbaarheid per uitje**: planner/admin kan elk tabblad aan- of uitzetten voor lezers (👁️ Zichtbaarheid)
+- **Eigen tabbladen** (＋ Tab, alleen admin): Tekst, Lijst of Afvinklijst, bijv. inpaklijst, menu of huisregels
+- **Zichtbaarheid per uitje**: de admin kan elk tabblad aan- of uitzetten voor lezers (👁️ Zichtbaarheid)
 
 ## Starten
 
@@ -35,8 +35,8 @@ Alle gegevens staan in `./data` (SQLite-database, sessiesleutel en `uploads/` me
 
 | Rol      | Mag                                                                 |
 |----------|---------------------------------------------------------------------|
-| admin    | Alles: uitjes aanmaken/verwijderen, pincodes en beveiliging beheren |
-| planner  | Uitjes bewerken: planning, locatie, contactpersonen, gegevens       |
+| admin    | Alles: uitjes aanmaken/verwijderen, eigen tabbladen en zichtbaarheid, pincodes en beveiliging |
+| planner  | Inhoud van uitjes bewerken: planning, locatie, gegevens, aanwezigen, bijlagen, eigen tabbladen |
 | lezer    | Alleen inzien                                                       |
 
 Elke rol heeft een eigen pincode (4–8 cijfers). De pincode bepaalt de rol, dus ze moeten verschillend zijn.
