@@ -5,19 +5,29 @@ Rollen (via pincode):
   planner - uitjes bewerken (planning, locatie, gegevens)
   lezer   - alleen inzien
 """
+import mimetypes
 import os
+import re
 import secrets
+import shutil
+import uuid
 import sqlite3
 import time
 from datetime import datetime, timedelta
 from functools import wraps
 
-from flask import Flask, g, jsonify, request, send_from_directory, session
+from flask import Flask, g, jsonify, request, send_file, send_from_directory, session
 from werkzeug.security import check_password_hash, generate_password_hash
 
 DATA_DIR = os.environ.get("DATA_DIR", "/data")
 os.makedirs(DATA_DIR, exist_ok=True)
 DB_PATH = os.path.join(DATA_DIR, "weekend.db")
+UPLOAD_DIR = os.path.join(DATA_DIR, "uploads")
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", "25"))
+# deze types mogen in de browser geopend worden; al het andere wordt als download aangeboden
+INLINE_TYPES = {"image/jpeg", "image/png", "image/gif", "image/webp", "application/pdf",
+                "text/plain", "video/mp4", "audio/mpeg"}
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 STATIC_DIR = os.path.join(BASE_DIR, "static")
 try:
@@ -30,7 +40,8 @@ ROLES = ("admin", "planner", "lezer")
 RANK = {"lezer": 1, "planner": 2, "admin": 3}
 
 STATUSES = ("concept", "gepland", "gaande")
-TABS = ("planning", "dag", "locatie", "gegevens", "aanwezig")
+TABS = ("planning", "dag", "locatie", "gegevens", "aanwezig", "bijlagen")
+CUSTOM_KINDS = ("tekst", "lijst", "checklist")
 EVENT_FIELDS = ["title", "status", "hidden_tabs", "start_date", "end_date", "description", "emoji",
                 "location_name", "address", "location_notes", "details"]
 PLAN_FIELDS = ["day", "time_start", "time_end", "activity", "who", "notes"]
@@ -57,6 +68,7 @@ app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
     SESSION_COOKIE_SECURE=os.environ.get("COOKIE_SECURE", "0") == "1",
+    MAX_CONTENT_LENGTH=MAX_UPLOAD_MB * 1024 * 1024,
     PERMANENT_SESSION_LIFETIME=timedelta(hours=int(os.environ.get("SESSION_HOURS", "12"))),
 )
 
@@ -109,6 +121,32 @@ CREATE TABLE IF NOT EXISTS attendees (
     event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
     notes TEXT DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS custom_tabs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    emoji TEXT DEFAULT '📌',
+    kind TEXT NOT NULL DEFAULT 'tekst',
+    content TEXT DEFAULT '',
+    sort INTEGER DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS custom_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tab_id INTEGER NOT NULL REFERENCES custom_tabs(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    notes TEXT DEFAULT '',
+    done INTEGER DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS attachments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+    filename TEXT NOT NULL,
+    stored TEXT NOT NULL,
+    mime TEXT DEFAULT 'application/octet-stream',
+    size INTEGER DEFAULT 0,
+    description TEXT DEFAULT '',
+    uploaded_at REAL
 );
 CREATE TABLE IF NOT EXISTS contacts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -224,9 +262,10 @@ def valid_status(data):
         return False
     if "hidden_tabs" in data:
         parts = [t.strip() for t in data["hidden_tabs"].split(",") if t.strip()]
-        if any(t not in TABS for t in parts):
+        if any(t not in TABS and not re.fullmatch(r"c\d+", t) for t in parts):
             return False
-        data["hidden_tabs"] = ",".join(t for t in TABS if t in parts)
+        custom = [t for t in dict.fromkeys(parts) if t not in TABS]
+        data["hidden_tabs"] = ",".join([t for t in TABS if t in parts] + custom)
     return True
 
 
@@ -270,6 +309,7 @@ def me():
     if role not in RANK or session.get("ver") != get_setting(f"pinver_{role}", "0"):
         role = None
     return jsonify(role=role, title=get_setting("title", "Familieweekend"), version=VERSION,
+                   max_upload_mb=MAX_UPLOAD_MB,
                    admin_default=(role == "admin" and get_setting("admin_default") == "1"))
 
 
@@ -377,8 +417,20 @@ def get_event(event_id):
         "SELECT day, title, notes FROM event_days WHERE event_id=?", (event_id,))}
     ev["attendees"] = [dict(r) for r in db.execute(
         "SELECT * FROM attendees WHERE event_id=? ORDER BY name COLLATE NOCASE, id", (event_id,))]
+    tabs = [dict(r) for r in db.execute(
+        "SELECT * FROM custom_tabs WHERE event_id=? ORDER BY sort, id", (event_id,))]
+    for t in tabs:
+        t["items"] = [dict(r) for r in db.execute(
+            "SELECT * FROM custom_items WHERE tab_id=? ORDER BY done, id", (t["id"],))]
+    ev["custom_tabs"] = tabs
+    ev["attachments"] = [dict(r) for r in db.execute(
+        "SELECT id, filename, mime, size, description, uploaded_at FROM attachments "
+        "WHERE event_id=? ORDER BY uploaded_at DESC, id DESC", (event_id,))]
     # verborgen tabbladen: gegevens niet meesturen naar lezers
     hidden = hidden_for_reader(ev)
+    ev["custom_tabs"] = [t for t in tabs if f"c{t['id']}" not in hidden]
+    if "bijlagen" in hidden:
+        ev["attachments"] = []
     if {"planning", "dag"} <= hidden:
         ev["planning"] = []
     if "dag" in hidden:
@@ -440,6 +492,7 @@ def delete_event(event_id):
     db = get_db()
     db.execute("DELETE FROM events WHERE id=?", (event_id,))
     db.commit()
+    shutil.rmtree(os.path.join(UPLOAD_DIR, str(event_id)), ignore_errors=True)
     return jsonify(ok=True)
 
 
@@ -499,6 +552,259 @@ def _child_routes(table, fields, required, required_msg):
 _child_routes("planning", PLAN_FIELDS, "activity", "Vul een activiteit in.")
 _child_routes("contacts", CONTACT_FIELDS, "name", "Vul een naam in.")
 _child_routes("attendees", ATTENDEE_FIELDS, "name", "Vul een naam in.")
+
+
+# ---------------------------------------------------------------- eigen tabbladen
+def _tab(tab_id):
+    row = get_db().execute("SELECT * FROM custom_tabs WHERE id=?", (tab_id,)).fetchone()
+    return dict(row) if row else None
+
+
+@app.post("/api/events/<int:event_id>/tabs")
+@require("planner")
+def create_tab(event_id):
+    if not event_or_404(event_id):
+        return err("Uitje niet gevonden.", 404)
+    d = body()
+    title = str(d.get("title") or "").strip()[:40]
+    kind = d.get("kind", "tekst")
+    if not title:
+        return err("Geef het tabblad een naam.")
+    if kind not in CUSTOM_KINDS:
+        return err("Onbekend soort tabblad.")
+    db = get_db()
+    sort = db.execute("SELECT COALESCE(MAX(sort), 0) + 1 FROM custom_tabs WHERE event_id=?",
+                      (event_id,)).fetchone()[0]
+    cur = db.execute("INSERT INTO custom_tabs(event_id, title, emoji, kind, sort) VALUES(?,?,?,?,?)",
+                     (event_id, title, str(d.get("emoji") or "📌")[:8], kind, sort))
+    _touch(event_id)
+    db.commit()
+    return jsonify(id=cur.lastrowid), 201
+
+
+@app.put("/api/tabs/<int:tab_id>")
+@require("planner")
+def update_tab(tab_id):
+    t = _tab(tab_id)
+    if not t:
+        return err("Tabblad niet gevonden.", 404)
+    d = body()
+    data = {}
+    if "title" in d:
+        data["title"] = str(d["title"] or "").strip()[:40]
+        if not data["title"]:
+            return err("De naam mag niet leeg zijn.")
+    if "emoji" in d:
+        data["emoji"] = str(d["emoji"] or "📌")[:8]
+    if "content" in d:
+        data["content"] = str(d["content"] or "")[:50000]
+    if "kind" in d:
+        if d["kind"] not in CUSTOM_KINDS:
+            return err("Onbekend soort tabblad.")
+        data["kind"] = d["kind"]
+    if data:
+        db = get_db()
+        db.execute(f"UPDATE custom_tabs SET {', '.join(f'{k}=?' for k in data)} WHERE id=?",
+                   list(data.values()) + [tab_id])
+        _touch(t["event_id"])
+        db.commit()
+    return jsonify(ok=True)
+
+
+@app.post("/api/tabs/<int:tab_id>/move")
+@require("planner")
+def move_tab(tab_id):
+    """Verplaats een eigen tabblad naar links (-1) of rechts (+1)."""
+    t = _tab(tab_id)
+    if not t:
+        return err("Tabblad niet gevonden.", 404)
+    step = -1 if int(body().get("dir", 1)) < 0 else 1
+    db = get_db()
+    ids = [r["id"] for r in db.execute(
+        "SELECT id FROM custom_tabs WHERE event_id=? ORDER BY sort, id", (t["event_id"],))]
+    i = ids.index(tab_id)
+    j = i + step
+    if 0 <= j < len(ids):
+        ids[i], ids[j] = ids[j], ids[i]
+        for n, tid in enumerate(ids):
+            db.execute("UPDATE custom_tabs SET sort=? WHERE id=?", (n, tid))
+        db.commit()
+    return jsonify(ok=True)
+
+
+@app.delete("/api/tabs/<int:tab_id>")
+@require("planner")
+def delete_tab(tab_id):
+    t = _tab(tab_id)
+    if t:
+        db = get_db()
+        db.execute("DELETE FROM custom_tabs WHERE id=?", (tab_id,))
+        _touch(t["event_id"])
+        db.commit()
+    return jsonify(ok=True)
+
+
+@app.post("/api/tabs/<int:tab_id>/items")
+@require("planner")
+def create_item(tab_id):
+    t = _tab(tab_id)
+    if not t:
+        return err("Tabblad niet gevonden.", 404)
+    d = body()
+    title = str(d.get("title") or "").strip()[:500]
+    if not title:
+        return err("Vul een omschrijving in.")
+    db = get_db()
+    cur = db.execute("INSERT INTO custom_items(tab_id, title, notes, done) VALUES(?,?,?,?)",
+                     (tab_id, title, str(d.get("notes") or "")[:5000], 1 if d.get("done") else 0))
+    _touch(t["event_id"])
+    db.commit()
+    return jsonify(id=cur.lastrowid), 201
+
+
+def _item_event(item_id):
+    return get_db().execute(
+        "SELECT t.event_id FROM custom_items i JOIN custom_tabs t ON t.id=i.tab_id WHERE i.id=?",
+        (item_id,)).fetchone()
+
+
+@app.put("/api/items/<int:item_id>")
+@require("planner")
+def update_item(item_id):
+    row = _item_event(item_id)
+    if not row:
+        return err("Niet gevonden.", 404)
+    d = body()
+    data = {}
+    if "title" in d:
+        data["title"] = str(d["title"] or "").strip()[:500]
+        if not data["title"]:
+            return err("Vul een omschrijving in.")
+    if "notes" in d:
+        data["notes"] = str(d["notes"] or "")[:5000]
+    if "done" in d:
+        data["done"] = 1 if d["done"] else 0
+    if data:
+        db = get_db()
+        db.execute(f"UPDATE custom_items SET {', '.join(f'{k}=?' for k in data)} WHERE id=?",
+                   list(data.values()) + [item_id])
+        _touch(row["event_id"])
+        db.commit()
+    return jsonify(ok=True)
+
+
+@app.delete("/api/items/<int:item_id>")
+@require("planner")
+def delete_item(item_id):
+    row = _item_event(item_id)
+    if row:
+        db = get_db()
+        db.execute("DELETE FROM custom_items WHERE id=?", (item_id,))
+        _touch(row["event_id"])
+        db.commit()
+    return jsonify(ok=True)
+
+
+# ---------------------------------------------------------------- bijlagen
+@app.errorhandler(413)
+def too_large(_e):
+    return err(f"Bestand(en) te groot. Maximaal {MAX_UPLOAD_MB} MB per keer.", 413, "too_large")
+
+
+def _clean_name(name):
+    name = os.path.basename(str(name or "").replace("\\", "/")).strip()
+    name = re.sub(r"[\x00-\x1f\x7f]", "", name)[:150]
+    return name or "bestand"
+
+
+@app.post("/api/events/<int:event_id>/attachments")
+@require("planner")
+def upload_attachments(event_id):
+    if not event_or_404(event_id):
+        return err("Uitje niet gevonden.", 404)
+    files = [f for f in request.files.getlist("files") if f and f.filename]
+    if not files:
+        return err("Kies minimaal één bestand.")
+    desc = str(request.form.get("description") or "")[:1000]
+    folder = os.path.join(UPLOAD_DIR, str(event_id))
+    os.makedirs(folder, exist_ok=True)
+    db = get_db()
+    ids = []
+    for f in files:
+        name = _clean_name(f.filename)
+        mime = mimetypes.guess_type(name)[0] or "application/octet-stream"
+        stored = uuid.uuid4().hex
+        path = os.path.join(folder, stored)
+        f.save(path)
+        cur = db.execute(
+            "INSERT INTO attachments(event_id, filename, stored, mime, size, description, uploaded_at) "
+            "VALUES(?,?,?,?,?,?,?)",
+            (event_id, name, stored, mime, os.path.getsize(path), desc, time.time()))
+        ids.append(cur.lastrowid)
+    _touch(event_id)
+    db.commit()
+    return jsonify(ids=ids), 201
+
+
+def _attachment(att_id):
+    row = get_db().execute("SELECT * FROM attachments WHERE id=?", (att_id,)).fetchone()
+    return dict(row) if row else None
+
+
+@app.get("/api/attachments/<int:att_id>")
+@require("lezer")
+def download_attachment(att_id):
+    a = _attachment(att_id)
+    ev = event_or_404(a["event_id"]) if a else None
+    if not a or not ev or "bijlagen" in hidden_for_reader(ev):
+        return err("Bijlage niet gevonden.", 404)
+    path = os.path.join(UPLOAD_DIR, str(a["event_id"]), a["stored"])
+    if not os.path.isfile(path):
+        return err("Bestand ontbreekt op de server.", 404)
+    inline = a["mime"] in INLINE_TYPES and request.args.get("download") != "1"
+    resp = send_file(path, mimetype=a["mime"], as_attachment=not inline,
+                     download_name=a["filename"], conditional=True, max_age=0)
+    # geüploade bestanden nooit als actieve pagina laten draaien
+    resp.headers["Content-Security-Policy"] = "default-src 'none'; img-src 'self'; media-src 'self'; " \
+                                              "style-src 'unsafe-inline'; sandbox"
+    resp.headers["Cache-Control"] = "private, no-store"
+    return resp
+
+
+@app.put("/api/attachments/<int:att_id>")
+@require("planner")
+def update_attachment(att_id):
+    a = _attachment(att_id)
+    if not a:
+        return err("Bijlage niet gevonden.", 404)
+    d = body()
+    data = {}
+    if "description" in d:
+        data["description"] = str(d["description"] or "")[:1000]
+    if "filename" in d:
+        data["filename"] = _clean_name(d["filename"])
+    if data:
+        db = get_db()
+        db.execute(f"UPDATE attachments SET {', '.join(f'{k}=?' for k in data)} WHERE id=?",
+                   list(data.values()) + [att_id])
+        db.commit()
+    return jsonify(ok=True)
+
+
+@app.delete("/api/attachments/<int:att_id>")
+@require("planner")
+def delete_attachment(att_id):
+    a = _attachment(att_id)
+    if a:
+        db = get_db()
+        db.execute("DELETE FROM attachments WHERE id=?", (att_id,))
+        _touch(a["event_id"])
+        db.commit()
+        try:
+            os.remove(os.path.join(UPLOAD_DIR, str(a["event_id"]), a["stored"]))
+        except OSError:
+            pass
+    return jsonify(ok=True)
 
 
 # ---------------------------------------------------------------- admin

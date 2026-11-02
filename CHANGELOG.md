@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.0.4] - 2026-11-02
+
+### Toegevoegd
+- **Eigen tabbladen** per uitje (knop **＋ Tab**, planner/admin), met naam, pictogram en soort:
+  - 📝 **Tekst**: vrij tekstveld (bijv. huisregels).
+  - 📋 **Lijst**: regels met omschrijving en bijzonderheden (bijv. menu).
+  - ✅ **Afvinklijst**: regels om af te vinken met voortgangsbalk (bijv. inpaklijst, boodschappen).
+  - Tabbladen hernoemen, van soort wisselen, naar links/rechts verplaatsen en verwijderen.
+- **Tabblad Bijlagen**: bestanden uploaden (klikken of slepen, meerdere tegelijk) met omschrijving.
+  - Foto's als voorvertoning; foto's en PDF's openen in de browser, andere bestanden worden gedownload.
+  - Maximale uploadgrootte instelbaar met `MAX_UPLOAD_MB` (standaard 25 MB).
+  - Bestanden staan in `data/uploads/` en worden verwijderd als het uitje wordt verwijderd.
+- Eigen tabbladen en Bijlagen doen mee in **👁️ Zichtbaarheid**.
+
+### Beveiliging
+- Bestandstype wordt bepaald door de server (niet door de browser); onveilige types worden altijd als download
+  aangeboden en bijlagen krijgen een strikte Content-Security-Policy.
+- Lezers kunnen bijlagen van een verborgen tabblad ook niet via een directe link openen.
+
+### Migratie
+- Bestaande databases worden automatisch bijgewerkt.
+
 ## [0.0.3] - 2026-10-22
 
 ### Toegevoegd

@@ -14,6 +14,8 @@ services:
       - BEHIND_PROXY=0
       # Zet op 1 als je de site via HTTPS benadert.
       - COOKIE_SECURE=0
+      # Maximale grootte van bijlagen per upload (MB).
+      - MAX_UPLOAD_MB=25
     volumes:
       - ./data:/data
     restart: unless-stopped

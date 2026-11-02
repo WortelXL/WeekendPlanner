@@ -200,6 +200,41 @@ select.status-sel{border:1px solid var(--line);border-radius:99px;padding:3px 8p
 @media (max-width:640px){.att .body{display:block}.att .bz{font-size:14px;color:var(--muted)}.att .bz:empty{display:none}
   .tabs button{padding:10px 10px}}
 
+/* eigen tabbladen */
+.tabs button.add{color:var(--brand);font-weight:600}
+.tabtools{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.tabtools .kind{font-size:13px;color:var(--muted);margin-right:auto}
+.citem{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--line)}
+.citem:last-child{border-bottom:0}
+.citem .body{flex:1;min-width:0}
+.citem .t{font-weight:600;overflow-wrap:anywhere}
+.citem .n{font-size:14px;color:var(--muted);white-space:pre-wrap}
+.citem.done .t{text-decoration:line-through;color:var(--muted)}
+.citem input[type=checkbox]{width:22px;height:22px;accent-color:var(--brand);flex:0 0 auto}
+.progress{height:8px;border-radius:99px;background:var(--line);overflow:hidden;margin:4px 0 14px}
+.progress span{display:block;height:100%;background:var(--brand);transition:width .3s}
+.kinds{display:grid;gap:8px}
+.kinds label{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:12px;cursor:pointer;background:var(--bg)}
+.kinds input{margin-top:4px;accent-color:var(--brand)}
+.kinds small{display:block;color:var(--muted);font-size:13px}
+
+/* bijlagen */
+.drop{border:2px dashed var(--line);border-radius:var(--radius);padding:22px 16px;text-align:center;background:var(--card);cursor:pointer;transition:.15s;margin-bottom:16px}
+.drop:hover,.drop.over{border-color:var(--brand);background:var(--brand-soft)}
+.drop .big{font-size:34px}
+.drop input[type=file]{display:none}
+.upbar{height:6px;border-radius:99px;background:var(--line);overflow:hidden;margin-top:10px}
+.upbar span{display:block;height:100%;width:0;background:var(--brand);transition:width .2s}
+.files{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px}
+.file{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.file .thumb{height:120px;background:var(--brand-soft);display:flex;align-items:center;justify-content:center;font-size:44px;overflow:hidden;color:inherit;text-decoration:none}
+.file .thumb img{width:100%;height:100%;object-fit:cover}
+.file .info{padding:8px 10px;flex:1;display:flex;flex-direction:column;gap:2px}
+.file .fn{font-weight:600;font-size:14px;overflow-wrap:anywhere}
+.file .fm{font-size:12px;color:var(--muted)}
+.file .fd{font-size:13px;white-space:pre-wrap}
+.file .fa{display:flex;gap:2px;padding:0 6px 6px}
+
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);
   padding:10px 16px;border-radius:10px;z-index:60;font-size:15px;opacity:0;transition:.2s;pointer-events:none}
 #toast.show{opacity:1}
@@ -244,7 +279,12 @@ const $ = s => document.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const TABS = [['planning','🗓️ Planning','Overzicht van alle dagen'],['dag','📆 Dagplanning','Per dag een eigen planning'],
   ['locatie','📍 Locatie','Adres, kaart en praktische info'],['gegevens','📋 Gegevens','Contactpersonen en overige info'],
-  ['aanwezig','👥 Aanwezig','Wie er komen, met bijzonderheden']];
+  ['aanwezig','👥 Aanwezig','Wie er komen, met bijzonderheden'],['bijlagen','📎 Bijlagen','Foto\'s, PDF\'s en andere bestanden']];
+const KINDS = {tekst:['📝 Tekst','Een vrij tekstveld, bijv. huisregels of een verhaal'],
+  lijst:['📋 Lijst','Regels met omschrijving en bijzonderheden, bijv. menu of activiteiten'],
+  checklist:['✅ Afvinklijst','Regels om af te vinken, bijv. inpaklijst of boodschappen']};
+const TAB_EMOJIS = ['📌','🧳','🛒','🍽️','🎲','🎁','💶','🚗','🏊','🐶','🎵','📷','⚽','🧒','💡','❤️'];
+const allTabs = e => [...TABS, ...(e.custom_tabs||[]).map(t=>['c'+t.id, `${t.emoji||'📌'} ${t.title}`, KINDS[t.kind]?.[0]||''])];
 const hiddenTabs = e => (e.hidden_tabs||'').split(',').filter(Boolean);
 const STATUS = {gaande:'Gaande', gepland:'Gepland', concept:'Concept'};
 const STATUS_ORDER = {gaande:0, gepland:1, concept:2};
@@ -335,7 +375,7 @@ async function logout(){ await api('POST','/api/logout').catch(()=>{}); S.role=n
 /* ---------- navigatie ---------- */
 async function boot(){
   const me = await api('GET','/api/me');
-  S.title = me.title; S.role = me.role; S.adminDefault = me.admin_default;
+  S.title = me.title; S.role = me.role; S.adminDefault = me.admin_default; S.maxUpload = me.max_upload_mb;
   ['#pinVer','#appVer'].forEach(x=>$(x).textContent = me.version ? 'Weekendplanner v'+me.version : '');
   document.title = S.title;
   if (!S.role) return showPin();
@@ -394,7 +434,7 @@ async function reload(){ try{ await loadEvent(S.event.id) }catch(e){ fail(e) } }
 function renderEvent(){
   const e = S.event, edit = can('planner');
   const hid = hiddenTabs(e);
-  const tabs = TABS.filter(([k])=> edit || !hid.includes(k));
+  const tabs = allTabs(e).filter(([k])=> edit || !hid.includes(k));
   if (tabs.length && !tabs.some(([k])=>k===S.tab)) S.tab = tabs[0][0];
   $('#main').innerHTML = `
     <div class="row" style="margin-bottom:14px"><button class="btn sm" onclick="go('list')">← Alle uitjes</button>
@@ -415,11 +455,12 @@ function renderEvent(){
     <div class="tabs">
       ${tabs.map(([k,l])=>
         `<button class="${S.tab===k?'on':''} ${hid.includes(k)?'off':''}" onclick="S.tab='${k}';renderEvent()" ${hid.includes(k)?'title="Verborgen voor lezers"':''}>${l}${hid.includes(k)?'<span class="eye">🚫</span>':''}</button>`).join('')}
+      ${edit?`<button class="add" onclick="newTab()" title="Eigen tabblad toevoegen">＋ Tab</button>`:''}
     </div>
     ${!tabs.length?`<div class="card empty"><div class="big">🙈</div><p>Er is voor dit uitje (nog) niets te zien.</p></div>`:`
     ${hid.includes(S.tab)?`<div class="hidden-note">🚫 Dit tabblad is <b>verborgen voor lezers</b>. Alleen planners en de admin zien het. Aanzetten via <a href="#" onclick="editVisibility();return false">👁️ Zichtbaarheid</a>.</div>`:''}
-    <div id="tabBody">${({planning:tabPlanning,dag:tabDag,locatie:tabLocatie,gegevens:tabGegevens,aanwezig:tabAanwezig})[S.tab]()}</div>`}`;
-  showActiveTab();
+    <div id="tabBody">${S.tab.startsWith('c')?tabCustom(+S.tab.slice(1)):({planning:tabPlanning,dag:tabDag,locatie:tabLocatie,gegevens:tabGegevens,aanwezig:tabAanwezig,bijlagen:tabBijlagen})[S.tab]()}</div>`}`;
+  showActiveTab(); bindDrop();
 }
 
 function showActiveTab(){ const t=document.querySelector('.tabs'), b=t&&t.querySelector('button.on'); if(!b) return;
@@ -546,11 +587,148 @@ function bulkAttendees(){
 function editVisibility(){
   const hid=hiddenTabs(S.event);
   modal({title:'Zichtbaarheid tabbladen', intro:'Vink aan welke tabbladen <b>lezers</b> bij dit uitje mogen zien. Uitgezette tabbladen blijven voor planners en de admin zichtbaar (gemarkeerd met 🚫), zodat je ze rustig kunt voorbereiden.',
-    fields:[{name:'show',type:'checks',label:'Zichtbaar voor lezers',options:TABS.map(([k,l,d])=>[k,l,d,!hid.includes(k)])}],
+    fields:[{name:'show',type:'checks',label:'Zichtbaar voor lezers',options:allTabs(S.event).map(([k,l,d])=>[k,l,d,!hid.includes(k)])}],
     onSubmit: async v=>{
-      const hidden=TABS.map(([k])=>k).filter(k=>!v.show.includes(k));
+      const hidden=allTabs(S.event).map(([k])=>k).filter(k=>!v.show.includes(k));
       await api('PUT','/api/events/'+S.event.id,{hidden_tabs:hidden.join(',')});
       toast(hidden.length?`${hidden.length} ${hidden.length===1?'tabblad':'tabbladen'} verborgen voor lezers`:'Alle tabbladen zichtbaar'); reload() }});
+}
+
+/* ---------- eigen tabbladen ---------- */
+function newTab(){
+  modal({title:'Eigen tabblad toevoegen', fields:[
+      {name:'title',label:'Naam van het tabblad',required:true,ph:'Bijv. Inpaklijst, Menu, Spelletjes'},
+      {name:'emoji',label:'Pictogram',type:'emoji',options:TAB_EMOJIS},
+      {name:'kind',label:'Soort',type:'kind',value:'tekst'}],
+    submit:'Toevoegen',
+    onSubmit: async v=>{ const r=await api('POST',`/api/events/${S.event.id}/tabs`,v);
+      S.tab='c'+r.id; toast('Tabblad toegevoegd'); reload() }});
+}
+function editTab(id){
+  const t=S.event.custom_tabs.find(x=>x.id===id);
+  modal({title:'Tabblad bewerken', fields:[
+      {name:'title',label:'Naam van het tabblad',value:t.title,required:true},
+      {name:'emoji',label:'Pictogram',type:'emoji',options:TAB_EMOJIS.includes(t.emoji)?TAB_EMOJIS:[t.emoji,...TAB_EMOJIS],value:t.emoji},
+      {name:'kind',label:'Soort',type:'kind',value:t.kind}],
+    intro: t.kind!=='tekst'?'Wissel je tussen Lijst en Afvinklijst, dan blijven de regels behouden. Bij Tekst worden de regels verborgen (niet gewist).':'',
+    onSubmit: async v=>{ await api('PUT','/api/tabs/'+id,v); toast('Tabblad opgeslagen'); reload() }});
+}
+async function moveTab(id,dir){ try{ await api('POST',`/api/tabs/${id}/move`,{dir}); reload() }catch(e){ fail(e) } }
+async function deleteTab(id){
+  const t=S.event.custom_tabs.find(x=>x.id===id);
+  if(!confirm(`Tabblad "${t.title}" met alle inhoud verwijderen?`)) return;
+  try{ await api('DELETE','/api/tabs/'+id); S.tab='planning'; toast('Tabblad verwijderd'); reload() }catch(e){ fail(e) }
+}
+function tabCustom(id){
+  const e=S.event, edit=can('planner'), t=(e.custom_tabs||[]).find(x=>x.id===id);
+  if(!t) return `<div class="card empty"><p>Tabblad niet gevonden.</p></div>`;
+  const ct=e.custom_tabs, idx=ct.indexOf(t);
+  const tools = edit?`<div class="tabtools"><span class="kind">${esc(KINDS[t.kind]?.[0]||'')}</span>
+      ${idx>0?`<button class="btn sm" title="Naar links" onclick="moveTab(${id},-1)">←</button>`:''}
+      ${idx<ct.length-1?`<button class="btn sm" title="Naar rechts" onclick="moveTab(${id},1)">→</button>`:''}
+      <button class="btn sm" onclick="editTab(${id})">✏️ Tabblad</button>
+      <button class="btn sm danger" onclick="deleteTab(${id})">🗑️</button></div>`:'';
+  if (t.kind==='tekst') return tools+`
+    ${edit?`<div class="row" style="margin-bottom:10px"><span class="spacer"></span><button class="btn sm primary" onclick="editTabText(${id})">✏️ Tekst bewerken</button></div>`:''}
+    <div class="card pre">${t.content?esc(t.content):'<span class="muted">Nog geen tekst.</span>'}</div>`;
+  const items=t.items||[], done=items.filter(i=>i.done).length, check=t.kind==='checklist';
+  return tools+`
+    ${check&&items.length?`<div class="row"><b>${done} van ${items.length} afgevinkt</b></div><div class="progress"><span style="width:${Math.round(done/items.length*100)}%"></span></div>`:''}
+    ${edit?`<form class="att-add" onsubmit="addItem(event,${id})">
+      <input class="field" name="title" placeholder="${check?'Bijv. Zaklamp':'Omschrijving'}" required maxlength="500">
+      <input class="field" name="notes" placeholder="Bijzonderheden (optioneel)">
+      <button class="btn primary">Toevoegen</button></form>`:''}
+    ${!items.length?`<div class="card empty"><div class="big">${esc(t.emoji||'📌')}</div><p>Nog niets toegevoegd.</p></div>`:
+    `<div class="card" style="padding:4px 0">${items.map(i=>`<div class="citem ${check&&i.done?'done':''}">
+        ${check?`<input type="checkbox" ${i.done?'checked':''} ${edit?`onchange="toggleItem(${i.id},this.checked)"`:'disabled'} aria-label="Afvinken">`:''}
+        <div class="body"><div class="t">${esc(i.title)}</div>${i.notes?`<div class="n">${esc(i.notes)}</div>`:''}</div>
+        ${edit?`<div class="acts" style="display:flex"><button class="icon-btn" title="Bewerken" onclick="editItem(${id},${i.id})">✏️</button><button class="icon-btn" title="Verwijderen" onclick="delCustomItem(${i.id})">🗑️</button></div>`:''}
+      </div>`).join('')}</div>`}`;
+}
+function editTabText(id){
+  const t=S.event.custom_tabs.find(x=>x.id===id);
+  modal({title:t.title, fields:[{name:'content',label:'Tekst',type:'textarea',rows:14,value:t.content}],
+    onSubmit: async v=>{ await api('PUT','/api/tabs/'+id,v); toast('Opgeslagen'); reload() }});
+}
+async function addItem(ev,id){
+  ev.preventDefault(); const f=ev.target;
+  const v={title:f.querySelector('[name=title]').value.trim(), notes:f.querySelector('[name=notes]').value.trim()};
+  if(!v.title) return;
+  try{ await api('POST',`/api/tabs/${id}/items`,v); await reload();
+    const n=document.querySelector('.att-add input[name=title]'); if(n) n.focus() }catch(e){ fail(e) }
+}
+async function toggleItem(iid,on){ try{ await api('PUT','/api/items/'+iid,{done:on}); reload() }catch(e){ fail(e) } }
+function editItem(tid,iid){
+  const i=S.event.custom_tabs.find(x=>x.id===tid).items.find(x=>x.id===iid);
+  modal({title:'Regel bewerken', fields:[
+      {name:'title',label:'Omschrijving',value:i.title,required:true},
+      {name:'notes',label:'Bijzonderheden',type:'textarea',rows:3,value:i.notes}],
+    onSubmit: async v=>{ await api('PUT','/api/items/'+iid,v); toast('Opgeslagen'); reload() }});
+}
+async function delCustomItem(iid){
+  if(!confirm('Deze regel verwijderen?')) return;
+  try{ await api('DELETE','/api/items/'+iid); reload() }catch(e){ fail(e) }
+}
+
+/* ---------- bijlagen ---------- */
+function fmtSize(b){ return b<1024?b+' B':b<1048576?(b/1024).toFixed(0)+' KB':(b/1048576).toFixed(1)+' MB' }
+function fileIcon(m,n){ m=m||''; n=(n||'').toLowerCase();
+  if(m.startsWith('image/')) return '🖼️'; if(m==='application/pdf') return '📕'; if(m.startsWith('video/')) return '🎬'; if(m.startsWith('audio/')) return '🎵';
+  if(/\.(docx?|odt|rtf|txt)$/.test(n)) return '📄'; if(/\.(xlsx?|ods|csv)$/.test(n)) return '📊'; if(/\.(pptx?|odp)$/.test(n)) return '📽️';
+  if(/\.(zip|rar|7z|gz)$/.test(n)) return '🗜️'; return '📎' }
+const THUMB_TYPES=['image/jpeg','image/png','image/gif','image/webp'];
+function tabBijlagen(){
+  const e=S.event, edit=can('planner'), list=e.attachments||[];
+  return `
+    ${edit?`<div class="drop" id="drop" onclick="document.getElementById('fileIn').click()">
+      <div class="big">📤</div><b>Bestanden toevoegen</b>
+      <div class="help">Klik of sleep bestanden hierheen. Foto's, PDF's, documenten… (max. ${S.maxUpload||25} MB per keer)</div>
+      <input type="file" id="fileIn" multiple onchange="uploadFiles(this.files)">
+      <div class="upbar hidden" id="upbar"><span></span></div></div>`:''}
+    <div class="section-title" style="margin-top:0"><h3>📎 ${list.length} ${list.length===1?'bijlage':'bijlagen'}</h3></div>
+    ${!list.length?`<div class="card empty"><div class="big">📎</div><p>Nog geen bijlagen.</p></div>`:
+    `<div class="files">${list.map(a=>{ const url='/api/attachments/'+a.id;
+      return `<div class="file">
+        <a class="thumb" href="${url}" target="_blank" rel="noopener">${THUMB_TYPES.includes(a.mime)?`<img src="${url}" loading="lazy" alt="">`:fileIcon(a.mime,a.filename)}</a>
+        <div class="info"><div class="fn">${esc(a.filename)}</div>
+          <div class="fm">${fmtSize(a.size)} · ${new Date(a.uploaded_at*1000).toLocaleDateString('nl-NL',{day:'numeric',month:'short'})}</div>
+          ${a.description?`<div class="fd">${esc(a.description)}</div>`:''}</div>
+        <div class="fa"><a class="icon-btn" href="${url}?download=1" title="Downloaden">⬇️</a>
+          ${edit?`<button class="icon-btn" title="Bewerken" onclick="editAttachment(${a.id})">✏️</button><button class="icon-btn" title="Verwijderen" onclick="delAttachment(${a.id})">🗑️</button>`:''}</div>
+      </div>`}).join('')}</div>`}`;
+}
+function bindDrop(){
+  const d=document.getElementById('drop'); if(!d) return;
+  ['dragenter','dragover'].forEach(n=>d.addEventListener(n,ev=>{ev.preventDefault();d.classList.add('over')}));
+  ['dragleave','drop'].forEach(n=>d.addEventListener(n,ev=>{ev.preventDefault();d.classList.remove('over')}));
+  d.addEventListener('drop',ev=>{ if(ev.dataTransfer.files.length) uploadFiles(ev.dataTransfer.files) });
+}
+function uploadFiles(files){
+  if(!files||!files.length) return;
+  const max=(S.maxUpload||25)*1048576, total=[...files].reduce((n,f)=>n+f.size,0);
+  if(total>max) return toast(`Te groot: maximaal ${S.maxUpload||25} MB per keer.`);
+  const fd=new FormData(); [...files].forEach(f=>fd.append('files',f));
+  const bar=document.getElementById('upbar'); bar.classList.remove('hidden');
+  const xhr=new XMLHttpRequest(); xhr.open('POST',`/api/events/${S.event.id}/attachments`);
+  xhr.upload.onprogress=ev=>{ if(ev.lengthComputable) bar.firstElementChild.style.width=(ev.loaded/ev.total*100)+'%' };
+  xhr.onload=()=>{ let j={}; try{ j=JSON.parse(xhr.responseText) }catch(e){}
+    if(xhr.status===401){ S.role=null; return showPin() }
+    if(xhr.status>=300) { bar.classList.add('hidden'); return toast(j.message||'Uploaden mislukt') }
+    toast(`${files.length} ${files.length===1?'bestand':'bestanden'} toegevoegd`); reload() };
+  xhr.onerror=()=>{ bar.classList.add('hidden'); toast('Uploaden mislukt') };
+  xhr.send(fd);
+}
+function editAttachment(id){
+  const a=S.event.attachments.find(x=>x.id===id);
+  modal({title:'Bijlage bewerken', fields:[
+      {name:'filename',label:'Bestandsnaam',value:a.filename,required:true},
+      {name:'description',label:'Omschrijving',type:'textarea',rows:3,value:a.description,ph:'Bijv. Boekingsbevestiging, plattegrond park'}],
+    onSubmit: async v=>{ await api('PUT','/api/attachments/'+id,v); toast('Opgeslagen'); reload() }});
+}
+async function delAttachment(id){
+  const a=S.event.attachments.find(x=>x.id===id);
+  if(!confirm(`"${a.filename}" verwijderen?`)) return;
+  try{ await api('DELETE','/api/attachments/'+id); toast('Bijlage verwijderd'); reload() }catch(e){ fail(e) }
 }
 
 function tabLocatie(){
@@ -593,7 +771,9 @@ function modal({title, fields, submit, onSubmit, intro}){
   const f = fld => {
     const v = esc(fld.value ?? '');
     if (fld.type==='emoji') return `<label class="lbl">${fld.label}</label><div class="emoji-pick" data-name="${fld.name}">
-      ${EMOJIS.map(x=>`<button type="button" class="${x===(fld.value||EMOJIS[0])?'on':''}">${x}</button>`).join('')}</div>`;
+      ${(fld.options||EMOJIS).map((x,i,a)=>`<button type="button" class="${x===(fld.value||a[0])?'on':''}">${x}</button>`).join('')}</div>`;
+    if (fld.type==='kind') return `<label class="lbl">${fld.label}</label><div class="kinds">${Object.entries(KINDS).map(([k,[l,d]])=>
+      `<label><input type="radio" name="${fld.name}" value="${k}" ${k===(fld.value||'tekst')?'checked':''}><span>${esc(l)}<small>${esc(d)}</small></span></label>`).join('')}</div>`;
     if (fld.type==='checks') return `<label class="lbl">${fld.label}</label><div class="checks">${fld.options.map(([k,l,d,on])=>
       `<label><input type="checkbox" data-checks="${fld.name}" value="${esc(k)}" ${on?'checked':''}><span>${esc(l)}<small>${esc(d||'')}</small></span></label>`).join('')}</div>`;
     if (fld.type==='textarea') return `<label class="lbl">${fld.label}</label><textarea class="field" name="${fld.name}" rows="${fld.rows||4}" placeholder="${esc(fld.ph||'')}">${v}</textarea>`;
@@ -614,7 +794,7 @@ function modal({title, fields, submit, onSubmit, intro}){
   const first=form.querySelector('input:not([type=checkbox]),textarea'); if(first) setTimeout(()=>first.focus(),50);
   form.onsubmit=async ev=>{
     ev.preventDefault();
-    const vals={}; form.querySelectorAll('[name]').forEach(i=>vals[i.name]=i.value.trim());
+    const vals={}; form.querySelectorAll('[name]').forEach(i=>{ if(i.type==='radio'){ if(i.checked) vals[i.name]=i.value } else vals[i.name]=i.value.trim() });
     form.querySelectorAll('[data-checks]').forEach(i=>{ const n=i.dataset.checks; vals[n]=vals[n]||[]; if(i.checked) vals[n].push(i.value) });
     form.querySelectorAll('.emoji-pick').forEach(p=>vals[p.dataset.name]=p.querySelector('.on')?.textContent||'');
     try{ await onSubmit(vals); close() }catch(e){ form.querySelector('.error').textContent=e.message }
