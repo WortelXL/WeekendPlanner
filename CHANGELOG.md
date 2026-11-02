@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.0.8] - 2026-11-02
+
+### Toegevoegd
+- **Link per regel in Lijst en Afvinklijst**: bij elke regel kun je een webadres invullen (snel-toevoegen of ✏️ bewerken).
+  De link verschijnt als klikbaar label met de websitenaam (bijv. 🔗 teso.nl) en opent in een nieuw tabblad.
+  `www.voorbeeld.nl` wordt automatisch `https://www.voorbeeld.nl`; alleen http(s) is toegestaan.
+
+### Migratie
+- Bestaande databases worden automatisch bijgewerkt.
+
 ## [0.0.7] - 2026-11-02
 
 ### Toegevoegd

@@ -252,6 +252,13 @@ a.lnk{color:var(--brand);text-decoration:underline;text-underline-offset:2px;ove
 .uprow .addlink .big{font-size:30px}
 .field-help{font-size:12px;color:var(--muted);margin-top:4px}
 
+.att-add.wide{grid-template-columns:1.2fr 1.2fr 1fr auto}
+@media (max-width:640px){.att-add.wide{grid-template-columns:1fr}}
+a.ilink{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:13px;font-weight:600;color:var(--brand);background:var(--brand-soft);
+  border-radius:99px;padding:2px 10px;text-decoration:none;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+a.ilink:hover{text-decoration:underline}
+.citem.done a.ilink{opacity:.7}
+
 #toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--ink);color:var(--bg);
   padding:10px 16px;border-radius:10px;z-index:60;font-size:15px;opacity:0;transition:.2s;pointer-events:none}
 #toast.show{opacity:1}
@@ -308,6 +315,7 @@ const STATUS_ORDER = {gaande:0, gepland:1, concept:2};
 const statusBadge = st => `<span class="status st-${esc(st||'concept')}">${esc(STATUS[st]||'Concept')}</span>`;
 const todayStr = () => { const x=new Date(); return `${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}` };
 /* Maakt webadressen in tekst klikbaar. Ondersteunt ook [linktekst](https://...). Alleen http(s). */
+function hostOf(url){ try{ return new URL(url).hostname.replace(/^www\./,'') }catch(e){ return url } }
 function linkify(text){
   let h = esc(text); const keep=[];
   const a = (url,label)=>{ const href = /^https?:\/\//i.test(url) ? url : 'https://'+url;
@@ -663,14 +671,16 @@ function tabCustom(id){
   const items=t.items||[], done=items.filter(i=>i.done).length, check=t.kind==='checklist';
   return tools+`
     ${check&&items.length?`<div class="row"><b>${done} van ${items.length} afgevinkt</b></div><div class="progress"><span style="width:${Math.round(done/items.length*100)}%"></span></div>`:''}
-    ${edit?`<form class="att-add" onsubmit="addItem(event,${id})">
+    ${edit?`<form class="att-add wide" onsubmit="addItem(event,${id})">
       <input class="field" name="title" placeholder="${check?'Bijv. Zaklamp':'Omschrijving'}" required maxlength="500">
       <input class="field" name="notes" placeholder="Bijzonderheden (optioneel)">
+      <input class="field" name="url" placeholder="🔗 Link (optioneel)" inputmode="url" autocapitalize="off" spellcheck="false">
       <button class="btn primary">Toevoegen</button></form>`:''}
     ${!items.length?`<div class="card empty"><div class="big">${esc(t.emoji||'📌')}</div><p>Nog niets toegevoegd.</p></div>`:
     `<div class="card" style="padding:4px 0">${items.map(i=>`<div class="citem ${check&&i.done?'done':''}">
         ${check?`<input type="checkbox" ${i.done?'checked':''} ${edit?`onchange="toggleItem(${i.id},this.checked)"`:'disabled'} aria-label="Afvinken">`:''}
-        <div class="body"><div class="t">${linkify(i.title)}</div>${i.notes?`<div class="n">${linkify(i.notes)}</div>`:''}</div>
+        <div class="body"><div class="t">${linkify(i.title)}</div>${i.notes?`<div class="n">${linkify(i.notes)}</div>`:''}
+          ${i.url?`<a class="ilink" href="${esc(i.url)}" target="_blank" rel="noopener noreferrer">🔗 ${esc(hostOf(i.url))}</a>`:''}</div>
         ${edit?`<div class="acts" style="display:flex"><button class="icon-btn" title="Bewerken" onclick="editItem(${id},${i.id})">✏️</button><button class="icon-btn" title="Verwijderen" onclick="delCustomItem(${i.id})">🗑️</button></div>`:''}
       </div>`).join('')}</div>`}`;
 }
@@ -681,7 +691,7 @@ function editTabText(id){
 }
 async function addItem(ev,id){
   ev.preventDefault(); const f=ev.target;
-  const v={title:f.querySelector('[name=title]').value.trim(), notes:f.querySelector('[name=notes]').value.trim()};
+  const v={title:f.querySelector('[name=title]').value.trim(), notes:f.querySelector('[name=notes]').value.trim(), url:f.querySelector('[name=url]').value.trim()};
   if(!v.title) return;
   try{ await api('POST',`/api/tabs/${id}/items`,v); await reload();
     const n=document.querySelector('.att-add input[name=title]'); if(n) n.focus() }catch(e){ fail(e) }
@@ -691,7 +701,8 @@ function editItem(tid,iid){
   const i=S.event.custom_tabs.find(x=>x.id===tid).items.find(x=>x.id===iid);
   modal({title:'Regel bewerken', fields:[
       {name:'title',label:'Omschrijving',value:i.title,required:true},
-      {name:'notes',label:'Bijzonderheden',type:'textarea',rows:3,value:i.notes}],
+      {name:'notes',label:'Bijzonderheden',type:'textarea',rows:3,value:i.notes},
+      {name:'url',label:'Link (optioneel)',value:i.url,ph:'https://www.voorbeeld.nl'}],
     onSubmit: async v=>{ await api('PUT','/api/items/'+iid,v); toast('Opgeslagen'); reload() }});
 }
 async function delCustomItem(iid){

@@ -137,6 +137,7 @@ CREATE TABLE IF NOT EXISTS custom_items (
     tab_id INTEGER NOT NULL REFERENCES custom_tabs(id) ON DELETE CASCADE,
     title TEXT NOT NULL,
     notes TEXT DEFAULT '',
+    url TEXT DEFAULT '',
     done INTEGER DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS attachments (
@@ -207,6 +208,9 @@ def init_db():
             db.execute("ALTER TABLE events ADD COLUMN status TEXT DEFAULT 'gepland'")
         if "hidden_tabs" not in cols:
             db.execute("ALTER TABLE events ADD COLUMN hidden_tabs TEXT DEFAULT ''")
+        item_cols = [r["name"] for r in db.execute("PRAGMA table_info(custom_items)")]
+        if "url" not in item_cols:
+            db.execute("ALTER TABLE custom_items ADD COLUMN url TEXT DEFAULT ''")
         db.commit()
         defaults = {"max_attempts": "5", "lockout_minutes": "10", "title": "Familieweekend"}
         for k, v in defaults.items():
@@ -704,9 +708,14 @@ def create_item(tab_id):
     title = str(d.get("title") or "").strip()[:500]
     if not title:
         return err("Vul een omschrijving in.")
+    url = ""
+    if str(d.get("url") or "").strip():
+        url = clean_url(d["url"])
+        if not url:
+            return err("Vul een geldige link in, bijv. https://www.voorbeeld.nl")
     db = get_db()
-    cur = db.execute("INSERT INTO custom_items(tab_id, title, notes, done) VALUES(?,?,?,?)",
-                     (tab_id, title, str(d.get("notes") or "")[:5000], 1 if d.get("done") else 0))
+    cur = db.execute("INSERT INTO custom_items(tab_id, title, notes, url, done) VALUES(?,?,?,?,?)",
+                     (tab_id, title, str(d.get("notes") or "")[:5000], url, 1 if d.get("done") else 0))
     _touch(t["event_id"])
     db.commit()
     return jsonify(id=cur.lastrowid), 201
@@ -734,6 +743,12 @@ def update_item(item_id):
             return err("Vul een omschrijving in.")
     if "notes" in d:
         data["notes"] = str(d["notes"] or "")[:5000]
+    if "url" in d:
+        data["url"] = ""
+        if str(d["url"] or "").strip():
+            data["url"] = clean_url(d["url"])
+            if not data["url"]:
+                return err("Vul een geldige link in, bijv. https://www.voorbeeld.nl")
     if "done" in d:
         data["done"] = 1 if d["done"] else 0
     if data:
