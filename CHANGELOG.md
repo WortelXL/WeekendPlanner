@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.0.9] - 2026-11-02
+
+### Toegevoegd
+- **Linknaam per regel** in Lijst en Afvinklijst: geef de link een eigen naam (hyperlink), bijv.
+  🔗 *Tickets bestellen* in plaats van 🔗 *teso.nl*. Leeg gelaten? Dan wordt de websitenaam getoond.
+  Het volledige webadres zie je als je met de muis over de link gaat.
+
+### Migratie
+- Bestaande databases worden automatisch bijgewerkt; bestaande links tonen de websitenaam.
+
 ## [0.0.8] - 2026-11-02
 
 ### Toegevoegd

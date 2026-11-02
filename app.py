@@ -138,6 +138,7 @@ CREATE TABLE IF NOT EXISTS custom_items (
     title TEXT NOT NULL,
     notes TEXT DEFAULT '',
     url TEXT DEFAULT '',
+    url_label TEXT DEFAULT '',
     done INTEGER DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS attachments (
@@ -211,6 +212,8 @@ def init_db():
         item_cols = [r["name"] for r in db.execute("PRAGMA table_info(custom_items)")]
         if "url" not in item_cols:
             db.execute("ALTER TABLE custom_items ADD COLUMN url TEXT DEFAULT ''")
+        if "url_label" not in item_cols:
+            db.execute("ALTER TABLE custom_items ADD COLUMN url_label TEXT DEFAULT ''")
         db.commit()
         defaults = {"max_attempts": "5", "lockout_minutes": "10", "title": "Familieweekend"}
         for k, v in defaults.items():
@@ -714,8 +717,9 @@ def create_item(tab_id):
         if not url:
             return err("Vul een geldige link in, bijv. https://www.voorbeeld.nl")
     db = get_db()
-    cur = db.execute("INSERT INTO custom_items(tab_id, title, notes, url, done) VALUES(?,?,?,?,?)",
-                     (tab_id, title, str(d.get("notes") or "")[:5000], url, 1 if d.get("done") else 0))
+    label = str(d.get("url_label") or "").strip()[:100] if url else ""
+    cur = db.execute("INSERT INTO custom_items(tab_id, title, notes, url, url_label, done) VALUES(?,?,?,?,?,?)",
+                     (tab_id, title, str(d.get("notes") or "")[:5000], url, label, 1 if d.get("done") else 0))
     _touch(t["event_id"])
     db.commit()
     return jsonify(id=cur.lastrowid), 201
@@ -749,6 +753,10 @@ def update_item(item_id):
             data["url"] = clean_url(d["url"])
             if not data["url"]:
                 return err("Vul een geldige link in, bijv. https://www.voorbeeld.nl")
+        if not data["url"]:
+            data["url_label"] = ""
+    if "url_label" in d and data.get("url", True):
+        data["url_label"] = str(d["url_label"] or "").strip()[:100]
     if "done" in d:
         data["done"] = 1 if d["done"] else 0
     if data:
